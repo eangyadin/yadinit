@@ -1,0 +1,113 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+
+export default function QuizApp() {
+  const [userName, setUserName] = useState("");
+  const [isStarted, setIsStarted] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [score, setScore] = useState(0);
+
+  // ទិន្នន័យសំណួរគំរូ
+  const questions = [
+    { question: "តើប្រទេសកម្ពុជាមានខេត្តក្រុងប៉ុន្មាន?", options: ["២៣", "២៤", "២៥", "២៦"], answer: 2 },
+    { question: "តើប្រាសាទអង្គរវត្តសាងសង់នៅសតវត្សទីប៉ុន្មាន?", options: ["ទី៩", "ទី១០", "ទី១១", "ទី១២"], answer: 3 }
+  ];
+
+  // អនុញ្ញាតឱ្យចូលលេង ពេលបានវាយបញ្ចូលឈ្មោះ
+  const handleStart = () => {
+    if (userName.trim() !== "") {
+      setIsStarted(true);
+    }
+  };
+
+  // ពេលអ្នកលេងចុចជ្រើសរើសចម្លើយ
+  const handleAnswer = (index) => {
+    if (index === questions[currentSlide].answer) {
+      setScore(score + 10); // បូក១០ពិន្ទុ បើត្រូវ
+    }
+    setCurrentSlide(currentSlide + 1);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
+      
+      {/* អេក្រង់ទី១៖ បញ្ចូលឈ្មោះ */}
+      {!isStarted ? (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center"
+        >
+          <div className="text-5xl mb-4">🏆</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">សូមស្វាគមន៍!</h2>
+          <p className="text-gray-500 mb-6">សូមវាយបញ្ចូលឈ្មោះរបស់អ្នកដើម្បីចូលរួម</p>
+          
+          <input 
+            type="text" 
+            placeholder="ឈ្មោះរបស់អ្នក..."
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none mb-4 text-center font-medium text-lg"
+          />
+          
+          <button 
+            onClick={handleStart}
+            disabled={!userName}
+            className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
+              userName ? "bg-blue-600 hover:bg-blue-700 shadow-lg" : "bg-gray-300 cursor-not-allowed"
+            }`}
+          >
+            ចូលរួមប្រកួត 🚀
+          </button>
+        </motion.div>
+      ) : (
+        
+        /* អេក្រង់ទី២៖ កម្រងសំណួរ (Slides) */
+        currentSlide < questions.length ? (
+          <motion.div 
+            key={currentSlide}
+            initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }}
+            className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-md"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
+                សំណួរទី {currentSlide + 1}/{questions.length}
+              </span>
+              <span className="font-bold text-gray-700">អ្នកលេង: {userName}</span>
+            </div>
+            
+            <h2 className="text-xl font-bold text-gray-800 mb-6 text-center leading-relaxed">
+              {questions[currentSlide].question}
+            </h2>
+            
+            <div className="space-y-3">
+              {questions[currentSlide].options.map((option, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleAnswer(index)}
+                  className="w-full text-left px-5 py-4 rounded-xl border-2 border-gray-100 hover:border-purple-500 hover:bg-purple-50 transition-all font-medium text-gray-700"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        ) : (
+          
+          /* អេក្រង់ទី៣៖ បង្ហាញលទ្ធផល */
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center"
+          >
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">អបអរសាទរ {userName}!</h2>
+            <p className="text-gray-500 mb-6">អ្នកបានបញ្ចប់ការប្រកួត</p>
+            <div className="text-5xl font-black text-blue-600 mb-8">
+              {score} <span className="text-xl text-gray-500 font-medium">ពិន្ទុ</span>
+            </div>
+            <p className="text-sm text-gray-400">សូមរង់ចាំមើលតារាងចំណាត់ថ្នាក់ពីលោកគ្រូ/អ្នកគ្រូ</p>
+          </motion.div>
+        )
+      )}
+    </div>
+  );
+}
