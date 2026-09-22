@@ -15,9 +15,8 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase SDK សម្រាប់ Sync ទិន្នន័យ Realtime ឆ្លងអ៊ីនធឺណិតគ្រប់ឧបករណ៍ -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <!-- MQTT Broker សម្រាប់ Sync ទិន្នន័យពីទូរស័ព្ទសិស្សទៅកុំព្យូទ័រគ្រូឆ្លងអ៊ីនធឺណិត Realtime -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <!-- Confetti / Fireworks -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -40,22 +39,11 @@
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useState, useEffect } = React;
+      const { useState, useEffect, useRef } = React;
 
-      // ការតភ្ជាប់ Firebase Cloud Database (Realtime Sync)
-      const firebaseConfig = {
-        databaseURL: "https://ict-quiz-sync-default-rtdb.asia-southeast1.firebasedatabase.app"
-      };
-      
-      let db = null;
-      try {
-        if (!firebase.apps.length) {
-          firebase.initializeApp(firebaseConfig);
-        }
-        db = firebase.database();
-      } catch (e) {
-        console.error("Firebase init error:", e);
-      }
+      // បន្ទប់តភ្ជាប់ Real-time Cloud សាធារណៈ (MQTT WebSocket SSL)
+      const MQTT_TOPIC = "ict_cambodia_preyveng_quiz_sync_v2";
+      const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 
       const playSound = (type) => {
         try {
@@ -149,22 +137,38 @@
         const checkIsTeacher = () => {
           const hash = window.location.hash;
           const params = new URLSearchParams(window.location.search);
-          const role = params.get('role');
-          const isStoredTeacher = localStorage.getItem('quiz_role') === 'teacher';
-          return hash === '#admin' || role === 'teacher' || role === 'admin' || isStoredTeacher;
+          return hash === '#admin' || params.get('role') === 'teacher' || params.get('role') === 'admin';
         };
 
         const [isTeacher, setIsTeacher] = useState(checkIsTeacher);
         const [adminPass, setAdminPass] = useState('');
-        const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('quiz_admin_logged') === 'true');
+        const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [adminTab, setAdminTab] = useState('podium');
         const [hideHeader, setHideHeader] = useState(false);
         const [isDark, setIsDark] = useState(() => localStorage.getItem('quiz_theme') !== 'light');
-        const [appTitle, setAppTitle] = useState('តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
+        const [appTitle, setAppTitle] = useState(() => localStorage.getItem('quiz_app_title') || 'តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
 
-        const [activeQuestions, setActiveQuestions] = useState(DEFAULT_QUESTIONS);
-        const [editingQuestions, setEditingQuestions] = useState(DEFAULT_QUESTIONS);
-        const [leaderboard, setLeaderboard] = useState([]);
+        const [activeQuestions, setActiveQuestions] = useState(() => {
+          try {
+            const saved = localStorage.getItem('active_quiz_questions');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+          } catch (e) {}
+          return DEFAULT_QUESTIONS;
+        });
+
+        const [editingQuestions, setEditingQuestions] = useState(() => activeQuestions);
+        const [leaderboard, setLeaderboard] = useState(() => {
+          try {
+            const saved = localStorage.getItem('kahoot_board');
+            return saved ? JSON.parse(saved) : [];
+          } catch (e) { return []; }
+        });
+
+        const [isConnected, setIsConnected] = useState(false);
+        const mqttClientRef = useRef(null);
 
         const [userName, setUserName] = useState('');
         const [started, setStarted] = useState(false);
@@ -183,97 +187,105 @@
           });
         };
 
-        // ស្តាប់ទិន្នន័យពី Firebase Realtime Database ផ្ទាល់
+        // តភ្ជាប់ Real-time Cloud MQTT (រវាងទូរស័ព្ទសិស្ស និងកុំព្យូទ័រគ្រូ)
         useEffect(() => {
-          if (!db) return;
-
-          // 1. Leaderboard Sync
-          const scoresRef = db.ref('quiz_session/scores');
-          scoresRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-              const list = Object.values(data);
-              const sorted = sortLeaderboard(list);
-              setLeaderboard(sorted);
-              if (sorted.length === 3) triggerFireworks();
-            } else {
-              setLeaderboard([]);
-            }
+          const clientId = "quiz_user_" + Math.random().toString(16).substring(2, 8);
+          const client = mqtt.connect(MQTT_BROKER, {
+            clientId: clientId,
+            clean: true,
+            connectTimeout: 4000,
+            reconnectPeriod: 2000,
           });
 
-          // 2. Active Questions Sync
-          const questionsRef = db.ref('quiz_session/questions');
-          questionsRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data && Array.isArray(data) && data.length > 0) {
-              setActiveQuestions(data);
-              setEditingQuestions(data);
-            }
+          mqttClientRef.current = client;
+
+          client.on("connect", () => {
+            setIsConnected(true);
+            client.subscribe(MQTT_TOPIC);
           });
 
-          // 3. App Title Sync
-          const titleRef = db.ref('quiz_session/title');
-          titleRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) setAppTitle(data);
+          client.on("message", (topic, message) => {
+            try {
+              const packet = JSON.parse(message.toString());
+              if (packet.type === "NEW_SCORE") {
+                setLeaderboard((prev) => {
+                  const filtered = prev.filter((p) => p.id !== packet.payload.id);
+                  const updated = sortLeaderboard([...filtered, packet.payload]);
+                  localStorage.setItem("kahoot_board", JSON.stringify(updated));
+                  if (updated.length === 3) triggerFireworks();
+                  return updated;
+                });
+              } else if (packet.type === "CLEAR_SCORES") {
+                setLeaderboard([]);
+                localStorage.removeItem("kahoot_board");
+              } else if (packet.type === "SET_QUESTIONS") {
+                setActiveQuestions(packet.payload);
+                setEditingQuestions(packet.payload);
+                localStorage.setItem("active_quiz_questions", JSON.stringify(packet.payload));
+              } else if (packet.type === "SET_TITLE") {
+                setAppTitle(packet.payload);
+                localStorage.setItem("quiz_app_title", packet.payload);
+              }
+            } catch (e) {}
           });
 
           const handleHash = () => setIsTeacher(checkIsTeacher());
-          window.addEventListener('hashchange', handleHash);
-          const handleKey = (e) => { if (e.key === 'Escape') setHideHeader(p => !p); };
-          window.addEventListener('keydown', handleKey);
+          window.addEventListener("hashchange", handleHash);
+          const handleKey = (e) => { if (e.key === "Escape") setHideHeader((p) => !p); };
+          window.addEventListener("keydown", handleKey);
 
           return () => {
-            scoresRef.off();
-            questionsRef.off();
-            titleRef.off();
-            window.removeEventListener('hashchange', handleHash);
-            window.removeEventListener('keydown', handleKey);
+            if (client) client.end();
+            window.removeEventListener("hashchange", handleHash);
+            window.removeEventListener("keydown", handleKey);
           };
         }, []);
+
+        const sendMqttMessage = (type, payload) => {
+          if (mqttClientRef.current && mqttClientRef.current.connected) {
+            mqttClientRef.current.publish(MQTT_TOPIC, JSON.stringify({ type, payload }));
+          }
+        };
 
         const toggleTheme = () => {
           const nextTheme = !isDark;
           setIsDark(nextTheme);
-          localStorage.setItem('quiz_theme', nextTheme ? 'dark' : 'light');
+          localStorage.setItem("quiz_theme", nextTheme ? "dark" : "light");
         };
 
         const handleLoginAdmin = () => {
-          if (adminPass === '1234') {
+          if (adminPass === "1234") {
             setIsLoggedIn(true);
-            localStorage.setItem('quiz_admin_logged', 'true');
-            localStorage.setItem('quiz_role', 'teacher');
           } else {
-            alert('កូដសម្ងាត់មិនត្រូវទេ!');
+            alert("កូដសម្ងាត់មិនត្រូវទេ!");
           }
         };
 
         const handleLogoutAdmin = () => {
-          localStorage.removeItem('quiz_admin_logged');
-          localStorage.removeItem('quiz_role');
           setIsLoggedIn(false);
           setIsTeacher(false);
-          window.location.hash = '';
+          window.location.hash = "";
         };
 
         const handleTitleChange = (newTitle) => {
           setAppTitle(newTitle);
-          if (db) db.ref('quiz_session/title').set(newTitle);
+          localStorage.setItem("quiz_app_title", newTitle);
+          sendMqttMessage("SET_TITLE", newTitle);
         };
 
         const handleAddNewQuestion = () => {
           const newQ = {
             id: Date.now(),
             question: `សំណួរទី ${editingQuestions.length + 1}៖ ...`,
-            options: ['ជម្រើសទី ១', 'ជម្រើសទី ២', 'ជម្រើសទី ៣', 'ជម្រើសទី ៤'],
-            answer: 'ជម្រើសទី ១',
+            options: ["ជម្រើសទី ១", "ជម្រើសទី ២", "ជម្រើសទី ៣", "ជម្រើសទី ៤"],
+            answer: "ជម្រើសទី ១",
           };
           setEditingQuestions([...editingQuestions, newQ]);
         };
 
         const handleDeleteQuestion = (qIndex) => {
-          if (editingQuestions.length <= 1) return alert('កម្រងសំណួរត្រូវមានយ៉ាងហោចណាស់ ១ សំណួរ!');
-          if (confirm('តើអ្នកពិតជាចង់លុបសំណួរនេះមែនទេ?')) {
+          if (editingQuestions.length <= 1) return alert("កម្រងសំណួរត្រូវមានយ៉ាងហោចណាស់ ១ សំណួរ!");
+          if (confirm("តើអ្នកពិតជាចង់លុបសំណួរនេះមែនទេ?")) {
             setEditingQuestions(editingQuestions.filter((_, idx) => idx !== qIndex));
           }
         };
@@ -300,26 +312,27 @@
 
         const handleSaveAndActivate = () => {
           setActiveQuestions(editingQuestions);
-          if (db) {
-            db.ref('quiz_session/questions').set(editingQuestions);
-          }
+          localStorage.setItem("active_quiz_questions", JSON.stringify(editingQuestions));
+          sendMqttMessage("SET_QUESTIONS", editingQuestions);
           alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបាន Update ទៅទូរស័ព្ទសិស្សទាំងអស់រួចរាល់។`);
-          setAdminTab('podium');
+          setAdminTab("podium");
         };
 
         const handleClearScores = () => {
-          if (confirm('តើចង់សម្អាតពិន្ទុដើម្បីចាប់ផ្តើមជុំថ្មីមែនទេ?')) {
-            if (db) db.ref('quiz_session/scores').remove();
+          if (confirm("តើចង់សម្អាតពិន្ទុដើម្បីចាប់ផ្តើមជុំថ្មីមែនទេ?")) {
             setLeaderboard([]);
+            localStorage.removeItem("kahoot_board");
+            sendMqttMessage("CLEAR_SCORES", {});
           }
         };
 
         const handleRestoreDefault = () => {
-          if (confirm('តើអ្នកចង់ទាញយកសំណួរគំរូដើមទាំង ៥ មកវិញមែនទេ?')) {
+          if (confirm("តើអ្នកចង់ទាញយកសំណួរគំរូដើមទាំង ៥ មកវិញមែនទេ?")) {
             setEditingQuestions(DEFAULT_QUESTIONS);
             setActiveQuestions(DEFAULT_QUESTIONS);
-            if (db) db.ref('quiz_session/questions').set(DEFAULT_QUESTIONS);
-            alert('បានទាញយកសំណួរដើមមកវិញជោគជ័យ!');
+            localStorage.setItem("active_quiz_questions", JSON.stringify(DEFAULT_QUESTIONS));
+            sendMqttMessage("SET_QUESTIONS", DEFAULT_QUESTIONS);
+            alert("បានទាញយកសំណួរដើមមកវិញជោគជ័យ!");
           }
         };
 
@@ -340,14 +353,14 @@
           if (!started || answered || currentQ >= shuffledQuestions.length) return;
           if (timeLeft === 0) {
             setAnswered(true);
-            playSound('wrong');
+            playSound("wrong");
             setTotalTimeSpent((prev) => prev + 20);
             setTimeout(() => nextQuestion(score, totalTimeSpent + 20), 1200);
             return;
           }
           const timer = setInterval(() => {
             setTimeLeft((prev) => {
-              if (prev <= 5) playSound('tick');
+              if (prev <= 5) playSound("tick");
               return prev - 1;
             });
           }, 1000);
@@ -365,10 +378,10 @@
 
           let added = 0;
           if (optionText === shuffledQuestions[currentQ].answer) {
-            playSound('correct');
+            playSound("correct");
             added = 10;
           } else {
-            playSound('wrong');
+            playSound("wrong");
           }
 
           const newScore = score + added;
@@ -376,6 +389,7 @@
           setTimeout(() => nextQuestion(newScore, newTotalTime), 1200);
         };
 
+        // បញ្ជូនពិន្ទុឡើង Cloud ទៅកុំព្យូទ័រគ្រូ Real-time
         const nextQuestion = (finalScore, finalTotalTime) => {
           setAnswered(false);
           setSelectedOpt(null);
@@ -386,32 +400,29 @@
           } else {
             setCurrentQ(shuffledQuestions.length);
 
-            const playerId = "std_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
             const playerData = {
-              id: playerId,
+              id: Date.now() + "_" + Math.random().toString(36).substring(2, 6),
               name: userName,
               score: finalScore,
               timeSpent: finalTotalTime,
             };
 
-            // បញ្ជូនពិន្ទុឡើង Firebase Realtime Database
-            if (db) {
-              db.ref('quiz_session/scores/' + playerId).set(playerData);
-            }
+            // ផ្ញើពិន្ទុឡើង Cloud ភ្លាមៗ
+            sendMqttMessage("NEW_SCORE", playerData);
           }
         };
 
         const kahootColors = [
-          { bg: 'bg-red-600 hover:bg-red-500', border: 'border-red-700', shape: '▲' },
-          { bg: 'bg-blue-600 hover:bg-blue-500', border: 'border-blue-700', shape: '◆' },
-          { bg: 'bg-amber-500 hover:bg-amber-400', border: 'border-amber-600', shape: '●' },
-          { bg: 'bg-emerald-600 hover:bg-emerald-500', border: 'border-emerald-700', shape: '■' },
+          { bg: "bg-red-600 hover:bg-red-500", border: "border-red-700", shape: "▲" },
+          { bg: "bg-blue-600 hover:bg-blue-500", border: "border-blue-700", shape: "◆" },
+          { bg: "bg-amber-500 hover:bg-amber-400", border: "border-amber-600", shape: "●" },
+          { bg: "bg-emerald-600 hover:bg-emerald-500", border: "border-emerald-700", shape: "■" },
         ];
 
-        const themeBg = isDark ? 'bg-[#0b0f19] text-white' : 'bg-slate-50 text-slate-800';
-        const cardBg = isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200 shadow-sm';
-        const subText = isDark ? 'text-slate-400' : 'text-slate-500';
-        const inputBg = isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-300 text-slate-900';
+        const themeBg = isDark ? "bg-[#0b0f19] text-white" : "bg-slate-50 text-slate-800";
+        const cardBg = isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200 shadow-sm";
+        const subText = isDark ? "text-slate-400" : "text-slate-500";
+        const inputBg = isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-100 border-slate-300 text-slate-900";
 
         // =========================================================================
         // ផ្ទាំងគ្រូ (TEACHER / PROJECTOR VIEW)
@@ -429,7 +440,7 @@
                     placeholder="PIN: 1234"
                     value={adminPass}
                     onChange={(e) => setAdminPass(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleLoginAdmin()}
+                    onKeyDown={(e) => e.key === "Enter" && handleLoginAdmin()}
                     className={`w-full border rounded-xl p-3 text-center mb-4 focus:outline-none focus:border-purple-500 ${inputBg}`}
                   />
                   <button
@@ -439,7 +450,7 @@
                     ចូលប្រព័ន្ធ
                   </button>
                   <button
-                    onClick={() => { setIsTeacher(false); window.location.hash = ''; }}
+                    onClick={() => { setIsTeacher(false); window.location.hash = ""; }}
                     className="text-xs text-slate-400 hover:underline"
                   >
                     ← ត្រឡប់ទៅផ្ទាំងសិស្ស
@@ -461,7 +472,7 @@
                     onClick={toggleTheme}
                     className="bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700 p-2 rounded-2xl shadow-xl backdrop-blur-md transition"
                   >
-                    {isDark ? '☀️' : '🌙'}
+                    {isDark ? "☀️" : "🌙"}
                   </button>
                   <button
                     onClick={() => setHideHeader(false)}
@@ -476,17 +487,17 @@
                 <header className={`max-w-5xl mx-auto w-full flex flex-wrap gap-4 justify-between items-center border p-4 rounded-2xl mb-6 shadow-xl ${cardBg}`}>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
-                      onClick={() => setAdminTab('podium')}
+                      onClick={() => setAdminTab("podium")}
                       className={`px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 ${
-                        adminTab === 'podium' ? 'bg-amber-500 text-slate-950 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        adminTab === "podium" ? "bg-amber-500 text-slate-950 shadow-md" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                       }`}
                     >
                       🏆 ផ្ទាំងមើលពាន (Projector Display)
                     </button>
                     <button
-                      onClick={() => setAdminTab('questions')}
+                      onClick={() => setAdminTab("questions")}
                       className={`px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 ${
-                        adminTab === 'questions' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        adminTab === "questions" ? "bg-purple-600 text-white shadow-md" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                       }`}
                     >
                       ⚙️ ផ្ទាំងកែសំណួរ ({editingQuestions.length})
@@ -494,13 +505,17 @@
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/80 text-emerald-400 font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                      Cloud Sync ជាប់
+                    </span>
                     <button
                       onClick={toggleTheme}
                       className={`p-2 rounded-xl border text-sm transition ${
-                        isDark ? 'bg-slate-800 border-slate-700 text-amber-300' : 'bg-slate-100 border-slate-300 text-slate-700'
+                        isDark ? "bg-slate-800 border-slate-700 text-amber-300" : "bg-slate-100 border-slate-300 text-slate-700"
                       }`}
                     >
-                      {isDark ? '☀️ ផ្ទៃភ្លឺ' : '🌙 ផ្ទៃងងឹត'}
+                      {isDark ? "☀️ ផ្ទៃភ្លឺ" : "🌙 ផ្ទៃងងឹត"}
                     </button>
                     <button
                       onClick={() => setHideHeader(true)}
@@ -524,14 +539,14 @@
                 </header>
               )}
 
-              {adminTab === 'podium' && (
-                <div className={`max-w-5xl mx-auto w-full ${hideHeader ? 'pt-4' : ''}`}>
+              {adminTab === "podium" && (
+                <div className={`max-w-5xl mx-auto w-full ${hideHeader ? "pt-4" : ""}`}>
                   <div className="text-center mb-6">
                     <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-widest drop-shadow-md">
                       🏆 {appTitle}
                     </h1>
                     <p className={`text-xs mt-1 ${subText}`}>
-                      ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ + ប្រើពេលតិចជាងគេ (លឿនជាងគេ) | 🟢 Cloud Real-time ភ្ជាប់ជោគជ័យ
+                      ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ + ប្រើពេលតិចជាងគេ (លឿនជាងគេ) | 📡 Real-time Sync Online
                     </p>
                     {leaderboard.length < 3 ? (
                       <div className="inline-block mt-2 px-3 py-1 bg-purple-950/40 border border-purple-800/50 rounded-full text-[11px] text-purple-300 font-medium">
@@ -547,9 +562,9 @@
                   <div className="flex justify-center items-end gap-3 md:gap-6 max-w-2xl mx-auto h-64 mb-10">
                     {/* លេខ ២ */}
                     <div className="flex-1 flex flex-col items-center">
-                      <div className="text-sm font-bold truncate max-w-[100px] mb-1">{top2 ? top2.name : '...'}</div>
-                      <div className={`text-xs mb-0.5 ${subText}`}>{top2 ? `${top2.score} ពិន្ទុ` : ''}</div>
-                      <div className="text-[11px] text-purple-400 font-semibold mb-2">{top2 ? `⏱️ ${top2.timeSpent}s` : ''}</div>
+                      <div className="text-sm font-bold truncate max-w-[100px] mb-1">{top2 ? top2.name : "..."}</div>
+                      <div className={`text-xs mb-0.5 ${subText}`}>{top2 ? `${top2.score} ពិន្ទុ` : ""}</div>
+                      <div className="text-[11px] text-purple-400 font-semibold mb-2">{top2 ? `⏱️ ${top2.timeSpent}s` : ""}</div>
                       <div className="w-full bg-gradient-to-t from-slate-700 to-slate-500 rounded-t-2xl h-36 flex flex-col items-center justify-center border-t-4 border-slate-300 shadow-xl">
                         <span className="text-3xl">🥈</span>
                         <span className="text-xl font-black text-white mt-1">2</span>
@@ -559,9 +574,9 @@
                     {/* លេខ ១ */}
                     <div className="flex-1 flex flex-col items-center">
                       <span className="text-3xl animate-bounce">👑</span>
-                      <div className="text-base font-black text-amber-400 truncate max-w-[120px] mb-1">{top1 ? top1.name : '...'}</div>
-                      <div className="text-xs text-amber-400 font-bold mb-0.5">{top1 ? `${top1.score} ពិន្ទុ` : ''}</div>
-                      <div className="text-[11px] text-amber-300 font-bold mb-2">{top1 ? `⏱️ ប្រើពេល ${top1.timeSpent}s` : ''}</div>
+                      <div className="text-base font-black text-amber-400 truncate max-w-[120px] mb-1">{top1 ? top1.name : "..."}</div>
+                      <div className="text-xs text-amber-400 font-bold mb-0.5">{top1 ? `${top1.score} ពិន្ទុ` : ""}</div>
+                      <div className="text-[11px] text-amber-300 font-bold mb-2">{top1 ? `⏱️ ប្រើពេល ${top1.timeSpent}s` : ""}</div>
                       <div className="w-full bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-2xl h-48 flex flex-col items-center justify-center border-t-4 border-yellow-200 shadow-2xl shadow-amber-500/40">
                         <span className="text-4xl">🥇</span>
                         <span className="text-2xl font-black text-slate-950 mt-1">1</span>
@@ -570,9 +585,9 @@
 
                     {/* លេខ ៣ */}
                     <div className="flex-1 flex flex-col items-center">
-                      <div className="text-sm font-bold text-amber-600 truncate max-w-[100px] mb-1">{top3 ? top3.name : '...'}</div>
-                      <div className={`text-xs mb-0.5 ${subText}`}>{top3 ? `${top3.score} ពិន្ទុ` : ''}</div>
-                      <div className="text-[11px] text-purple-400 font-semibold mb-2">{top3 ? `⏱️ ${top3.timeSpent}s` : ''}</div>
+                      <div className="text-sm font-bold text-amber-600 truncate max-w-[100px] mb-1">{top3 ? top3.name : "..."}</div>
+                      <div className={`text-xs mb-0.5 ${subText}`}>{top3 ? `${top3.score} ពិន្ទុ` : ""}</div>
+                      <div className="text-[11px] text-purple-400 font-semibold mb-2">{top3 ? `⏱️ ${top3.timeSpent}s` : ""}</div>
                       <div className="w-full bg-gradient-to-t from-amber-900 to-amber-700 rounded-t-2xl h-28 flex flex-col items-center justify-center border-t-4 border-amber-600 shadow-lg">
                         <span className="text-3xl">🥉</span>
                         <span className="text-xl font-black text-white mt-1">3</span>
@@ -592,7 +607,7 @@
                           <div
                             key={idx}
                             className={`flex justify-between items-center px-4 py-2.5 rounded-xl border text-sm ${
-                              isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                              isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"
                             }`}
                           >
                             <div className="flex items-center gap-3">
@@ -613,7 +628,7 @@
                 </div>
               )}
 
-              {adminTab === 'questions' && (
+              {adminTab === "questions" && (
                 <div className="max-w-5xl mx-auto w-full space-y-6">
                   <div className={`border p-5 rounded-3xl shadow-xl flex flex-wrap items-center justify-between gap-4 ${cardBg}`}>
                     <div className="flex-1 min-w-[280px]">
@@ -676,7 +691,7 @@
                             <div
                               key={optIdx}
                               className={`flex items-center gap-2.5 border p-2.5 rounded-2xl ${
-                                isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                                isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"
                               }`}
                             >
                               <input
@@ -692,7 +707,7 @@
                                 onChange={(e) => handleOptionChange(qIdx, optIdx, e.target.value)}
                                 placeholder={`ជម្រើសទី ${optIdx + 1}`}
                                 className={`w-full bg-transparent text-xs focus:outline-none ${
-                                  q.answer === opt ? 'text-emerald-500 font-bold' : ''
+                                  q.answer === opt ? "text-emerald-500 font-bold" : ""
                                 }`}
                               />
                               {q.answer === opt && (
@@ -717,7 +732,7 @@
           <div className={`flex flex-col items-center justify-center min-h-screen p-4 relative ${themeBg}`}>
             <div className="absolute top-4 right-4">
               <button
-                onClick={() => { window.location.hash = '#admin'; setIsTeacher(true); }}
+                onClick={() => { window.location.hash = "#admin"; setIsTeacher(true); }}
                 className="text-[11px] bg-slate-800/60 hover:bg-slate-700/80 text-slate-400 border border-slate-700/70 px-3 py-1.5 rounded-xl transition flex items-center gap-1"
               >
                 <span>🔑</span>
@@ -739,14 +754,14 @@
                   placeholder="វាយឈ្មោះរបស់អ្នក..."
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && startStudentGame()}
+                  onKeyDown={(e) => e.key === "Enter" && startStudentGame()}
                   className={`w-full border rounded-xl p-3.5 text-center text-lg mb-4 focus:outline-none focus:border-purple-500 ${inputBg}`}
                 />
                 <button
                   onClick={startStudentGame}
                   disabled={!userName.trim()}
                   className={`w-full py-3.5 rounded-xl font-bold transition shadow-lg ${
-                    userName.trim() ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30' : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                    userName.trim() ? "bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30" : "bg-slate-800 text-slate-600 cursor-not-allowed"
                   }`}
                 >
                   ចូលរួមប្រកួត 🚀
@@ -764,7 +779,7 @@
                     សំណួរទី {currentQ + 1} / {shuffledQuestions.length}
                   </span>
 
-                  <div className={`flex items-center gap-1.5 font-black text-lg ${timeLeft <= 5 ? 'timer-warn' : 'text-amber-400'}`}>
+                  <div className={`flex items-center gap-1.5 font-black text-lg ${timeLeft <= 5 ? "timer-warn" : "text-amber-400"}`}>
                     <span>⏱️</span>
                     <span>{timeLeft}s</span>
                   </div>
@@ -785,11 +800,11 @@
 
                     if (answered) {
                       if (opt === shuffledQuestions[currentQ].answer) {
-                        extraStyle = 'bg-emerald-500 border-emerald-400 ring-4 ring-emerald-300 text-white scale-[1.02]';
+                        extraStyle = "bg-emerald-500 border-emerald-400 ring-4 ring-emerald-300 text-white scale-[1.02]";
                       } else if (selectedOpt === opt) {
-                        extraStyle = 'bg-rose-700 border-rose-600 opacity-60 text-white';
+                        extraStyle = "bg-rose-700 border-rose-600 opacity-60 text-white";
                       } else {
-                        extraStyle = 'opacity-30 bg-slate-800 border-slate-700';
+                        extraStyle = "opacity-30 bg-slate-800 border-slate-700";
                       }
                     }
 
@@ -813,7 +828,7 @@
                 <h2 className="text-2xl font-black mb-1">អបអរសាទរ {userName}!</h2>
                 <p className={`text-xs mb-4 ${subText}`}>អ្នកបានឆ្លើយចប់សំណួរទាំងអស់</p>
 
-                <div className={`border p-5 rounded-2xl mb-4 ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                <div className={`border p-5 rounded-2xl mb-4 ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
                   <span className={`text-xs uppercase tracking-widest font-bold ${subText}`}>ពិន្ទុទទួលបាន</span>
                   <div className="text-4xl font-black text-amber-400 my-1">
                     {score} <span className={`text-base font-normal ${subText}`}>ពិន្ទុ</span>
@@ -834,7 +849,7 @@
         );
       }
 
-      const root = ReactDOM.createRoot(document.getElementById('root'));
+      const root = ReactDOM.createRoot(document.getElementById("root"));
       root.render(<App />);
     </script>
   </body>
