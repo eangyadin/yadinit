@@ -1,113 +1,1107 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+<!DOCTYPE html>
+<html lang="km">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>តេស្តកញ្ចប់អំណាន - អ៊ាង យ៉ាឌីន ICTព្រៃវែង</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Confetti / Fireworks -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+      body {
+        font-family: 'Kantumruy Pro', sans-serif;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      @keyframes pulse-timer {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.08);
+        }
+      }
+      .timer-warn {
+        animation: pulse-timer 0.6s infinite;
+        color: #ef4444 !important;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen">
+    <div id="root"></div>
 
-export default function QuizApp() {
-  const [userName, setUserName] = useState("");
-  const [isStarted, setIsStarted] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [score, setScore] = useState(0);
+    <script type="text/babel">
+      const { useState, useEffect } = React;
 
-  // ទិន្នន័យសំណួរគំរូ
-  const questions = [
-    { question: "តើប្រទេសកម្ពុជាមានខេត្តក្រុងប៉ុន្មាន?", options: ["២៣", "២៤", "២៥", "២៦"], answer: 2 },
-    { question: "តើប្រាសាទអង្គរវត្តសាងសង់នៅសតវត្សទីប៉ុន្មាន?", options: ["ទី៩", "ទី១០", "ទី១១", "ទី១២"], answer: 3 }
-  ];
+      const playSound = (type) => {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
 
-  // អនុញ្ញាតឱ្យចូលលេង ពេលបានវាយបញ្ចូលឈ្មោះ
-  const handleStart = () => {
-    if (userName.trim() !== "") {
-      setIsStarted(true);
-    }
-  };
+          if (type === 'tick') {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(400, ctx.currentTime);
+            gain.gain.setValueAtTime(0.04, ctx.currentTime);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.04);
+          } else if (type === 'correct') {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+            osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+            osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(
+              0.01,
+              ctx.currentTime + 0.35
+            );
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+          } else if (type === 'wrong') {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(260, ctx.currentTime);
+            osc.frequency.setValueAtTime(190, ctx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+          } else if (type === 'victory') {
+            const notes = [523.25, 659.25, 783.99, 1046.5, 880, 1046.5];
+            const delays = [0, 0.15, 0.3, 0.45, 0.65, 0.85];
+            const durations = [0.12, 0.12, 0.12, 0.18, 0.15, 0.6];
 
-  // ពេលអ្នកលេងចុចជ្រើសរើសចម្លើយ
-  const handleAnswer = (index) => {
-    if (index === questions[currentSlide].answer) {
-      setScore(score + 10); // បូក១០ពិន្ទុ បើត្រូវ
-    }
-    setCurrentSlide(currentSlide + 1);
-  };
+            notes.forEach((freq, idx) => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(freq, ctx.currentTime + delays[idx]);
+              gain.gain.setValueAtTime(0.3, ctx.currentTime + delays[idx]);
+              gain.gain.exponentialRampToValueAtTime(
+                0.001,
+                ctx.currentTime + delays[idx] + durations[idx]
+              );
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start(ctx.currentTime + delays[idx]);
+              osc.stop(ctx.currentTime + delays[idx] + durations[idx]);
+            });
+          }
+        } catch (e) {}
+      };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-      
-      {/* អេក្រង់ទី១៖ បញ្ចូលឈ្មោះ */}
-      {!isStarted ? (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center"
-        >
-          <div className="text-5xl mb-4">🏆</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">សូមស្វាគមន៍!</h2>
-          <p className="text-gray-500 mb-6">សូមវាយបញ្ចូលឈ្មោះរបស់អ្នកដើម្បីចូលរួម</p>
-          
-          <input 
-            type="text" 
-            placeholder="ឈ្មោះរបស់អ្នក..."
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none mb-4 text-center font-medium text-lg"
-          />
-          
-          <button 
-            onClick={handleStart}
-            disabled={!userName}
-            className={`w-full py-3 rounded-xl font-bold text-white transition-all ${
-              userName ? "bg-blue-600 hover:bg-blue-700 shadow-lg" : "bg-gray-300 cursor-not-allowed"
-            }`}
-          >
-            ចូលរួមប្រកួត 🚀
-          </button>
-        </motion.div>
-      ) : (
-        
-        /* អេក្រង់ទី២៖ កម្រងសំណួរ (Slides) */
-        currentSlide < questions.length ? (
-          <motion.div 
-            key={currentSlide}
-            initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }}
-            className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-md"
-          >
-            <div className="flex justify-between items-center mb-6">
-              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
-                សំណួរទី {currentSlide + 1}/{questions.length}
-              </span>
-              <span className="font-bold text-gray-700">អ្នកលេង: {userName}</span>
-            </div>
-            
-            <h2 className="text-xl font-bold text-gray-800 mb-6 text-center leading-relaxed">
-              {questions[currentSlide].question}
-            </h2>
-            
-            <div className="space-y-3">
-              {questions[currentSlide].options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleAnswer(index)}
-                  className="w-full text-left px-5 py-4 rounded-xl border-2 border-gray-100 hover:border-purple-500 hover:bg-purple-50 transition-all font-medium text-gray-700"
+      const triggerFireworks = () => {
+        playSound('victory');
+        const duration = 3.5 * 1000;
+        const animationEnd = Date.now() + duration;
+        const defaults = {
+          startVelocity: 35,
+          spread: 360,
+          ticks: 70,
+          zIndex: 1000,
+        };
+
+        const randomInRange = (min, max) => Math.random() * (max - min) + min;
+
+        const interval = setInterval(() => {
+          const timeLeft = animationEnd - Date.now();
+          if (timeLeft <= 0) return clearInterval(interval);
+          const particleCount = 60 * (timeLeft / duration);
+
+          confetti({
+            ...defaults,
+            particleCount,
+            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+          });
+          confetti({
+            ...defaults,
+            particleCount,
+            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+          });
+        }, 250);
+      };
+
+      const shuffleArray = (arr) => {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+      };
+
+      const DEFAULT_QUESTIONS = [
+        {
+          id: 1,
+          question: 'តើព្យញ្ជនៈខ្មែរមានទាំងអស់ចំនួនប៉ុន្មានតួ?',
+          options: ['៣១ តួ', '៣២ តួ', '៣៣ តួ', '៣៤ តួ'],
+          answer: '៣៣ តួ',
+        },
+        {
+          id: 2,
+          question: 'តើពាក្យណាជាពាក្យត្រឹមត្រូវ?',
+          options: ['សាលារៀន', 'សាលារៀនន', 'សាលារៀនម', 'សាលារៀនង'],
+          answer: 'សាលារៀន',
+        },
+        {
+          id: 3,
+          question: 'តើស្រៈនិស្ស័យក្នុងភាសាខ្មែរមានប៉ុន្មានតួ?',
+          options: ['២១ តួ', '២២ តួ', '២៣ តួ', '២៤ តួ'],
+          answer: '២៣ តួ',
+        },
+        {
+          id: 4,
+          question: 'តើពាក្យ «សៀវភៅ» ត្រូវនឹងអត្ថន័យអ្វី?',
+          options: [
+            'របស់សម្រាប់សរសេរ',
+            'របស់សម្រាប់អាន',
+            'របស់សម្រាប់កាត់',
+            'របស់សម្រាប់លុប',
+          ],
+          answer: 'របស់សម្រាប់អាន',
+        },
+        {
+          id: 5,
+          question: 'តើព្យញ្ជនៈណាជាព្យញ្ជនៈពួក (អ)?',
+          options: ['ក', 'គ', 'ឃ', 'ង'],
+          answer: 'ក',
+        },
+      ];
+
+      function App() {
+        // មុខងារស្គាល់សិស្ស និងគ្រូដោយស្វ័យប្រវត្តិ
+        const checkIsTeacher = () => {
+          const hash = window.location.hash;
+          const params = new URLSearchParams(window.location.search);
+          const role = params.get('role');
+          const isStoredTeacher = localStorage.getItem('quiz_role') === 'teacher';
+
+          if (hash === '#admin' || role === 'teacher' || role === 'admin' || isStoredTeacher) {
+            return true;
+          }
+          return false;
+        };
+
+        const [isTeacher, setIsTeacher] = useState(checkIsTeacher);
+        const [adminPass, setAdminPass] = useState('');
+        const [isLoggedIn, setIsLoggedIn] = useState(() => {
+          return localStorage.getItem('quiz_admin_logged') === 'true';
+        });
+        const [adminTab, setAdminTab] = useState('podium');
+        const [hideHeader, setHideHeader] = useState(false);
+
+        const [isDark, setIsDark] = useState(() => {
+          return localStorage.getItem('quiz_theme') !== 'light';
+        });
+
+        const [appTitle, setAppTitle] = useState(
+          () =>
+            localStorage.getItem('quiz_app_title') ||
+            'តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣'
+        );
+
+        const [activeQuestions, setActiveQuestions] = useState(() => {
+          try {
+            const saved = localStorage.getItem('active_quiz_questions');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+          } catch (e) {}
+          return DEFAULT_QUESTIONS;
+        });
+
+        const [editingQuestions, setEditingQuestions] = useState(
+          () => activeQuestions
+        );
+
+        const [leaderboard, setLeaderboard] = useState(() => {
+          try {
+            const saved = localStorage.getItem('kahoot_board');
+            return saved ? JSON.parse(saved) : [];
+          } catch (e) {
+            return [];
+          }
+        });
+
+        const [userName, setUserName] = useState('');
+        const [started, setStarted] = useState(false);
+        const [shuffledQuestions, setShuffledQuestions] = useState([]);
+        const [currentQ, setCurrentQ] = useState(0);
+        const [score, setScore] = useState(0);
+        const [timeLeft, setTimeLeft] = useState(20);
+        const [answered, setAnswered] = useState(false);
+        const [selectedOpt, setSelectedOpt] = useState(null);
+        const [totalTimeSpent, setTotalTimeSpent] = useState(0);
+
+        const sortLeaderboard = (list) => {
+          return [...list].sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            return a.timeSpent - b.timeSpent;
+          });
+        };
+
+        const toggleTheme = () => {
+          const nextTheme = !isDark;
+          setIsDark(nextTheme);
+          localStorage.setItem('quiz_theme', nextTheme ? 'dark' : 'light');
+        };
+
+        useEffect(() => {
+          const channel = new BroadcastChannel('quiz_network');
+          channel.onmessage = (event) => {
+            if (event.data?.type === 'NEW_SCORE') {
+              setLeaderboard((prev) => {
+                const updated = sortLeaderboard([...prev, event.data.payload]);
+                localStorage.setItem('kahoot_board', JSON.stringify(updated));
+
+                if (updated.length === 3) {
+                  triggerFireworks();
+                }
+                return updated;
+              });
+            } else if (event.data?.type === 'SET_TITLE') {
+              setAppTitle(event.data.payload);
+            } else if (event.data?.type === 'SET_ACTIVE_QUIZ') {
+              setActiveQuestions(event.data.payload);
+              setEditingQuestions(event.data.payload);
+            }
+          };
+
+          const handleHashOrUrl = () => {
+            setIsTeacher(checkIsTeacher());
+          };
+
+          window.addEventListener('hashchange', handleHashOrUrl);
+          window.addEventListener('popstate', handleHashOrUrl);
+
+          const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setHideHeader((prev) => !prev);
+          };
+          window.addEventListener('keydown', handleKeyDown);
+
+          return () => {
+            channel.close();
+            window.removeEventListener('hashchange', handleHashOrUrl);
+            window.removeEventListener('popstate', handleHashOrUrl);
+            window.removeEventListener('keydown', handleKeyDown);
+          };
+        }, []);
+
+        const handleLoginAdmin = () => {
+          if (adminPass === '1234') {
+            setIsLoggedIn(true);
+            localStorage.setItem('quiz_admin_logged', 'true');
+            localStorage.setItem('quiz_role', 'teacher');
+          } else {
+            alert('កូដសម្ងាត់មិនត្រូវទេ!');
+          }
+        };
+
+        const handleLogoutAdmin = () => {
+          localStorage.removeItem('quiz_admin_logged');
+          localStorage.removeItem('quiz_role');
+          setIsLoggedIn(false);
+          setIsTeacher(false);
+          window.location.hash = '';
+        };
+
+        const handleTitleChange = (newTitle) => {
+          setAppTitle(newTitle);
+          localStorage.setItem('quiz_app_title', newTitle);
+          const channel = new BroadcastChannel('quiz_network');
+          channel.postMessage({ type: 'SET_TITLE', payload: newTitle });
+          channel.close();
+        };
+
+        const handleAddNewQuestion = () => {
+          const newQ = {
+            id: Date.now(),
+            question: `សំណួរទី ${editingQuestions.length + 1}៖ ...`,
+            options: ['ជម្រើសទី ១', 'ជម្រើសទី ២', 'ជម្រើសទី ៣', 'ជម្រើសទី ៤'],
+            answer: 'ជម្រើសទី ១',
+          };
+          setEditingQuestions([...editingQuestions, newQ]);
+        };
+
+        const handleDeleteQuestion = (qIndex) => {
+          if (editingQuestions.length <= 1)
+            return alert('កម្រងសំណួរត្រូវមានយ៉ាងហោចណាស់ ១ សំណួរ!');
+          if (confirm('តើអ្នកពិតជាចង់លុបសំណួរនេះមែនទេ?')) {
+            setEditingQuestions(
+              editingQuestions.filter((_, idx) => idx !== qIndex)
+            );
+          }
+        };
+
+        const handleQuestionChange = (qIndex, value) => {
+          const updated = [...editingQuestions];
+          updated[qIndex].question = value;
+          setEditingQuestions(updated);
+        };
+
+        const handleOptionChange = (qIndex, optIndex, value) => {
+          const updated = [...editingQuestions];
+          const oldVal = updated[qIndex].options[optIndex];
+          updated[qIndex].options[optIndex] = value;
+          if (updated[qIndex].answer === oldVal) {
+            updated[qIndex].answer = value;
+          }
+          setEditingQuestions(updated);
+        };
+
+        const handleSetCorrectAnswer = (qIndex, optionValue) => {
+          const updated = [...editingQuestions];
+          updated[qIndex].answer = optionValue;
+          setEditingQuestions(updated);
+        };
+
+        const handleSaveAndActivate = () => {
+          setActiveQuestions(editingQuestions);
+          localStorage.setItem(
+            'active_quiz_questions',
+            JSON.stringify(editingQuestions)
+          );
+
+          const channel = new BroadcastChannel('quiz_network');
+          channel.postMessage({
+            type: 'SET_ACTIVE_QUIZ',
+            payload: editingQuestions,
+          });
+          channel.close();
+
+          alert(
+            `ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបានរក្សាទុក និងដាក់ឱ្យសិស្សលេង។`
+          );
+          setAdminTab('podium');
+        };
+
+        const handleRestoreDefault = () => {
+          if (confirm('តើអ្នកចង់ទាញយកសំណួរគំរូដើមទាំង ៥ មកវិញមែនទេ?')) {
+            setEditingQuestions(DEFAULT_QUESTIONS);
+            setActiveQuestions(DEFAULT_QUESTIONS);
+            localStorage.setItem(
+              'active_quiz_questions',
+              JSON.stringify(DEFAULT_QUESTIONS)
+            );
+            alert('បានទាញយកសំណួរដើមមកវិញជោគជ័យ!');
+          }
+        };
+
+        const startStudentGame = () => {
+          if (!userName.trim()) return;
+
+          const currentActive =
+            activeQuestions.length > 0 ? activeQuestions : DEFAULT_QUESTIONS;
+          const randomized = shuffleArray(currentActive).map((q) => ({
+            ...q,
+            options: shuffleArray(q.options),
+          }));
+
+          setShuffledQuestions(randomized);
+          setStarted(true);
+          setTimeLeft(20);
+          setTotalTimeSpent(0);
+        };
+
+        useEffect(() => {
+          if (!started || answered || currentQ >= shuffledQuestions.length)
+            return;
+
+          if (timeLeft === 0) {
+            setAnswered(true);
+            playSound('wrong');
+            setTotalTimeSpent((prev) => prev + 20);
+            setTimeout(() => nextQuestion(score, totalTimeSpent + 20), 1200);
+            return;
+          }
+
+          const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+              if (prev <= 5) playSound('tick');
+              return prev - 1;
+            });
+          }, 1000);
+
+          return () => clearInterval(timer);
+        }, [started, timeLeft, answered, currentQ, shuffledQuestions]);
+
+        const handleAnswer = (optionText) => {
+          if (answered) return;
+          setAnswered(true);
+          setSelectedOpt(optionText);
+
+          const timeUsed = 20 - timeLeft;
+          const newTotalTime = totalTimeSpent + timeUsed;
+          setTotalTimeSpent(newTotalTime);
+
+          let added = 0;
+          if (optionText === shuffledQuestions[currentQ].answer) {
+            playSound('correct');
+            added = 10;
+          } else {
+            playSound('wrong');
+          }
+
+          const newScore = score + added;
+          setScore(newScore);
+          setTimeout(() => nextQuestion(newScore, newTotalTime), 1200);
+        };
+
+        const nextQuestion = (finalScore, finalTotalTime) => {
+          setAnswered(false);
+          setSelectedOpt(null);
+          setTimeLeft(20);
+
+          if (currentQ + 1 < shuffledQuestions.length) {
+            setCurrentQ((prev) => prev + 1);
+          } else {
+            setCurrentQ(shuffledQuestions.length);
+
+            const playerData = {
+              id: Date.now() + Math.random(),
+              name: userName,
+              score: finalScore,
+              timeSpent: finalTotalTime,
+            };
+
+            const channel = new BroadcastChannel('quiz_network');
+            channel.postMessage({ type: 'NEW_SCORE', payload: playerData });
+            channel.close();
+
+            const existing = JSON.parse(
+              localStorage.getItem('kahoot_board') || '[]'
+            );
+            const updated = sortLeaderboard([...existing, playerData]);
+            localStorage.setItem('kahoot_board', JSON.stringify(updated));
+            setLeaderboard(updated);
+
+            if (updated.length === 3) {
+              triggerFireworks();
+            }
+          }
+        };
+
+        const kahootColors = [
+          {
+            bg: 'bg-red-600 hover:bg-red-500',
+            border: 'border-red-700',
+            shape: '▲',
+          },
+          {
+            bg: 'bg-blue-600 hover:bg-blue-500',
+            border: 'border-blue-700',
+            shape: '◆',
+          },
+          {
+            bg: 'bg-amber-500 hover:bg-amber-400',
+            border: 'border-amber-600',
+            shape: '●',
+          },
+          {
+            bg: 'bg-emerald-600 hover:bg-emerald-500',
+            border: 'border-emerald-700',
+            shape: '■',
+          },
+        ];
+
+        const themeBg = isDark
+          ? 'bg-[#0b0f19] text-white'
+          : 'bg-slate-50 text-slate-800';
+        const cardBg = isDark
+          ? 'bg-slate-900/90 border-slate-800'
+          : 'bg-white border-slate-200 shadow-sm';
+        const subText = isDark ? 'text-slate-400' : 'text-slate-500';
+        const inputBg = isDark
+          ? 'bg-slate-950 border-slate-800 text-white'
+          : 'bg-slate-100 border-slate-300 text-slate-900';
+
+        // =========================================================================
+        // ស្គាល់ជាគ្រូ (TEACHER / ADMIN VIEW)
+        // =========================================================================
+        if (isTeacher) {
+          if (!isLoggedIn) {
+            return (
+              <div
+                className={`flex items-center justify-center min-h-screen p-4 ${themeBg}`}
+              >
+                <div
+                  className={`p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl ${cardBg}`}
                 >
-                  {option}
-                </button>
-              ))}
+                  <div className="text-5xl mb-4">🔐</div>
+                  <h2 className="text-xl font-bold mb-2">ចូលផ្ទាំងគ្រូបង្រៀន</h2>
+                  <p className={`text-xs mb-6 ${subText}`}>
+                    វាយលេខសម្ងាត់ (1234)
+                  </p>
+                  <input
+                    type="password"
+                    placeholder="PIN: 1234"
+                    value={adminPass}
+                    onChange={(e) => setAdminPass(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLoginAdmin()}
+                    className={`w-full border rounded-xl p-3 text-center mb-4 focus:outline-none focus:border-purple-500 ${inputBg}`}
+                  />
+                  <button
+                    onClick={handleLoginAdmin}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition shadow-lg mb-2"
+                  >
+                    ចូលប្រព័ន្ធ
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsTeacher(false);
+                      window.location.hash = '';
+                    }}
+                    className="text-xs text-slate-400 hover:underline"
+                  >
+                    ← ត្រឡប់ទៅផ្ទាំងសិស្ស
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          const top1 = leaderboard[0];
+          const top2 = leaderboard[1];
+          const top3 = leaderboard[2];
+
+          return (
+            <div
+              className={`min-h-screen p-4 md:p-6 flex flex-col justify-between relative ${themeBg}`}
+            >
+              {hideHeader && (
+                <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+                  <button
+                    onClick={toggleTheme}
+                    className="bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700 p-2 rounded-2xl shadow-xl backdrop-blur-md transition"
+                    title="ប្តូរពណ៌ផ្ទៃ (ងងឹត/ភ្លឺ)"
+                  >
+                    {isDark ? '☀️' : '🌙'}
+                  </button>
+                  <button
+                    onClick={() => setHideHeader(false)}
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-2xl shadow-2xl border border-purple-400/40 transition flex items-center gap-2 text-xs"
+                  >
+                    ⚙️ បង្ហាញផ្ទាំងគ្រប់គ្រង
+                  </button>
+                </div>
+              )}
+
+              {!hideHeader && (
+                <header
+                  className={`max-w-5xl mx-auto w-full flex flex-wrap gap-4 justify-between items-center border p-4 rounded-2xl mb-6 shadow-xl ${cardBg}`}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setAdminTab('podium')}
+                      className={`px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 ${
+                        adminTab === 'podium'
+                          ? 'bg-amber-500 text-slate-950 shadow-md'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      🏆 ផ្ទាំងមើលពាន (Projector Display)
+                    </button>
+                    <button
+                      onClick={() => setAdminTab('questions')}
+                      className={`px-4 py-2 rounded-xl font-bold text-xs md:text-sm transition flex items-center gap-2 ${
+                        adminTab === 'questions'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      ⚙️ ផ្ទាំងកែសំណួរ ({editingQuestions.length})
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleTheme}
+                      className={`p-2 rounded-xl border text-sm transition ${
+                        isDark
+                          ? 'bg-slate-800 border-slate-700 text-amber-300'
+                          : 'bg-slate-100 border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      {isDark ? '☀️ ផ្ទៃភ្លឺ' : '🌙 ផ្ទៃងងឹត'}
+                    </button>
+                    <button
+                      onClick={() => setHideHeader(true)}
+                      className="bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                    >
+                      👁️‍🗨️ លាក់របារ
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (
+                          confirm(
+                            'តើចង់សម្អាតពិន្ទុដើម្បីចាប់ផ្តើមជុំថ្មីមែនទេ?'
+                          )
+                        ) {
+                          localStorage.removeItem('kahoot_board');
+                          setLeaderboard([]);
+                        }
+                      }}
+                      className="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl text-xs hover:bg-rose-500/30 transition"
+                    >
+                      សម្អាតពិន្ទុ
+                    </button>
+                    <button
+                      onClick={handleLogoutAdmin}
+                      className="bg-slate-800 text-slate-300 px-3 py-2 rounded-xl text-xs hover:bg-slate-700 transition"
+                    >
+                      ចាកចេញ
+                    </button>
+                  </div>
+                </header>
+              )}
+
+              {adminTab === 'podium' && (
+                <div
+                  className={`max-w-5xl mx-auto w-full ${
+                    hideHeader ? 'pt-4' : ''
+                  }`}
+                >
+                  <div className="text-center mb-6">
+                    <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-widest drop-shadow-md">
+                      🏆 {appTitle}
+                    </h1>
+                    <p className={`text-xs mt-1 ${subText}`}>
+                      ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ +
+                      ប្រើពេលតិចជាងគេ (លឿនជាងគេ)
+                    </p>
+                    {leaderboard.length < 3 ? (
+                      <div className="inline-block mt-2 px-3 py-1 bg-purple-950/40 border border-purple-800/50 rounded-full text-[11px] text-purple-300 font-medium">
+                        ⏳ កំពុងរង់ចាំអ្នកលេងគ្រប់ ៣ នាក់ ដើម្បីប្រកាសកាំជ្រួច
+                        និងសំឡេងជ័យជម្នះស្វ័យប្រវត្តិ ({leaderboard.length}/3)
+                      </div>
+                    ) : (
+                      <div className="inline-block mt-2 px-3 py-1 bg-emerald-950/40 border border-emerald-800/50 rounded-full text-[11px] text-emerald-400 font-bold">
+                        🎉 បានរកឃើញកំពូលអ្នកឈ្នះទាំង ៣ រូបពេញលេញហើយ!
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-center items-end gap-3 md:gap-6 max-w-2xl mx-auto h-64 mb-10">
+                    {/* លេខ ២ */}
+                    <div className="flex-1 flex flex-col items-center">
+                      <div className="text-sm font-bold truncate max-w-[100px] mb-1">
+                        {top2 ? top2.name : '...'}
+                      </div>
+                      <div className={`text-xs mb-0.5 ${subText}`}>
+                        {top2 ? `${top2.score} ពិន្ទុ` : ''}
+                      </div>
+                      <div className="text-[11px] text-purple-400 font-semibold mb-2">
+                        {top2 ? `⏱️ ${top2.timeSpent}s` : ''}
+                      </div>
+                      <div className="w-full bg-gradient-to-t from-slate-700 to-slate-500 rounded-t-2xl h-36 flex flex-col items-center justify-center border-t-4 border-slate-300 shadow-xl">
+                        <span className="text-3xl">🥈</span>
+                        <span className="text-xl font-black text-white mt-1">
+                          2
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* លេខ ១ */}
+                    <div className="flex-1 flex flex-col items-center">
+                      <span className="text-3xl animate-bounce">👑</span>
+                      <div className="text-base font-black text-amber-400 truncate max-w-[120px] mb-1">
+                        {top1 ? top1.name : '...'}
+                      </div>
+                      <div className="text-xs text-amber-400 font-bold mb-0.5">
+                        {top1 ? `${top1.score} ពិន្ទុ` : ''}
+                      </div>
+                      <div className="text-[11px] text-amber-300 font-bold mb-2">
+                        {top1 ? `⏱️ ប្រើពេល ${top1.timeSpent}s` : ''}
+                      </div>
+                      <div className="w-full bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-2xl h-48 flex flex-col items-center justify-center border-t-4 border-yellow-200 shadow-2xl shadow-amber-500/40">
+                        <span className="text-4xl">🥇</span>
+                        <span className="text-2xl font-black text-slate-950 mt-1">
+                          1
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* លេខ ៣ */}
+                    <div className="flex-1 flex flex-col items-center">
+                      <div className="text-sm font-bold text-amber-600 truncate max-w-[100px] mb-1">
+                        {top3 ? top3.name : '...'}
+                      </div>
+                      <div className={`text-xs mb-0.5 ${subText}`}>
+                        {top3 ? `${top3.score} ពិន្ទុ` : ''}
+                      </div>
+                      <div className="text-[11px] text-purple-400 font-semibold mb-2">
+                        {top3 ? `⏱️ ${top3.timeSpent}s` : ''}
+                      </div>
+                      <div className="w-full bg-gradient-to-t from-amber-900 to-amber-700 rounded-t-2xl h-28 flex flex-col items-center justify-center border-t-4 border-amber-600 shadow-lg">
+                        <span className="text-3xl">🥉</span>
+                        <span className="text-xl font-black text-white mt-1">
+                          3
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`border rounded-2xl p-5 shadow-xl ${cardBg}`}>
+                    <h3
+                      className={`text-xs font-bold uppercase tracking-wider mb-3 ${subText}`}
+                    >
+                      អ្នកចូលរួមទាំងអស់ ({leaderboard.length} នាក់)
+                    </h3>
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {leaderboard.length === 0 ? (
+                        <p className={`text-center py-6 text-sm ${subText}`}>
+                          មិនទាន់មានសិស្សឆ្លើយចប់នៅឡើយទេ...
+                        </p>
+                      ) : (
+                        leaderboard.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex justify-between items-center px-4 py-2.5 rounded-xl border text-sm ${
+                              isDark
+                                ? 'bg-slate-950/60 border-slate-800'
+                                : 'bg-slate-50 border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className={`font-bold w-6 ${subText}`}>
+                                #{idx + 1}
+                              </span>
+                              <span className="font-medium">{item.name}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className={`text-xs ${subText}`}>
+                                ⏱️ {item.timeSpent} វិនាទី
+                              </span>
+                              <span className="font-black text-amber-400">
+                                {item.score}{' '}
+                                <span
+                                  className={`text-xs font-normal ${subText}`}
+                                >
+                                  ពិន្ទុ
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {adminTab === 'questions' && (
+                <div className="max-w-5xl mx-auto w-full space-y-6">
+                  <div
+                    className={`border p-5 rounded-3xl shadow-xl flex flex-wrap items-center justify-between gap-4 ${cardBg}`}
+                  >
+                    <div className="flex-1 min-w-[280px]">
+                      <label className="text-xs text-amber-400 font-bold block mb-1">
+                        🏷️ កែប្រែចំណងជើងកម្មវិធី៖
+                      </label>
+                      <input
+                        type="text"
+                        value={appTitle}
+                        onChange={(e) => handleTitleChange(e.target.value)}
+                        className={`w-full border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:border-amber-400 ${inputBg}`}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                      <button
+                        onClick={handleRestoreDefault}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-xl text-xs font-bold transition"
+                      >
+                        🔄 យកសំណួរដើមមកវិញ
+                      </button>
+                      <button
+                        onClick={handleAddNewQuestion}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5"
+                      >
+                        ➕ បន្ថែមសំណួរ
+                      </button>
+                      <button
+                        onClick={handleSaveAndActivate}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-lg flex items-center gap-1.5"
+                      >
+                        💾 រក្សាទុក និងដាក់ឱ្យលេង ({editingQuestions.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {editingQuestions.map((q, qIdx) => (
+                      <div
+                        key={q.id || qIdx}
+                        className={`border p-5 rounded-3xl shadow-xl space-y-4 ${cardBg}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 flex items-center gap-3">
+                            <span className="bg-purple-950 text-purple-400 border border-purple-800 w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm">
+                              {qIdx + 1}
+                            </span>
+                            <input
+                              type="text"
+                              value={q.question}
+                              onChange={(e) =>
+                                handleQuestionChange(qIdx, e.target.value)
+                              }
+                              placeholder="វាយប្រធានសំណួរនៅទីនេះ..."
+                              className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 ${inputBg}`}
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleDeleteQuestion(qIdx)}
+                            className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 p-2.5 rounded-xl transition"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-11">
+                          {q.options.map((opt, optIdx) => (
+                            <div
+                              key={optIdx}
+                              className={`flex items-center gap-2.5 border p-2.5 rounded-2xl ${
+                                isDark
+                                  ? 'bg-slate-950 border-slate-800'
+                                  : 'bg-slate-50 border-slate-200'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`correct-ans-${qIdx}`}
+                                checked={q.answer === opt}
+                                onChange={() =>
+                                  handleSetCorrectAnswer(qIdx, opt)
+                                }
+                                className="accent-emerald-500 w-4 h-4 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={opt}
+                                onChange={(e) =>
+                                  handleOptionChange(
+                                    qIdx,
+                                    optIdx,
+                                    e.target.value
+                                  )
+                                }
+                                placeholder={`ជម្រើសទី ${optIdx + 1}`}
+                                className={`w-full bg-transparent text-xs focus:outline-none ${
+                                  q.answer === opt
+                                    ? 'text-emerald-500 font-bold'
+                                    : ''
+                                }`}
+                              />
+                              {q.answer === opt && (
+                                <span className="text-emerald-500 text-xs font-bold pr-2">
+                                  ✓ ត្រូវ
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </motion.div>
-        ) : (
-          
-          /* អេក្រង់ទី៣៖ បង្ហាញលទ្ធផល */
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center"
+          );
+        }
+
+        // =========================================================================
+        // ស្គាល់ជាសិស្ស (STUDENT VIEW)
+        // =========================================================================
+        return (
+          <div
+            className={`flex flex-col items-center justify-center min-h-screen p-4 relative ${themeBg}`}
           >
-            <div className="text-6xl mb-4">🎉</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">អបអរសាទរ {userName}!</h2>
-            <p className="text-gray-500 mb-6">អ្នកបានបញ្ចប់ការប្រកួត</p>
-            <div className="text-5xl font-black text-blue-600 mb-8">
-              {score} <span className="text-xl text-gray-500 font-medium">ពិន្ទុ</span>
+            {/* ប៊ូតុងផ្លូវកាត់សម្ងាត់សម្រាប់គ្រូចុចចូលផ្ទាំងគ្រប់គ្រង */}
+            <div className="absolute top-4 right-4">
+              <button
+                onClick={() => {
+                  window.location.hash = '#admin';
+                  setIsTeacher(true);
+                }}
+                className="text-[11px] bg-slate-800/60 hover:bg-slate-700/80 text-slate-400 border border-slate-700/70 px-3 py-1.5 rounded-xl transition flex items-center gap-1"
+                title="សម្រាប់គ្រូបើក Projector ឬកែសំណួរ"
+              >
+                <span>🔑</span>
+                <span>ផ្ទាំងគ្រូ</span>
+              </button>
             </div>
-            <p className="text-sm text-gray-400">សូមរង់ចាំមើលតារាងចំណាត់ថ្នាក់ពីលោកគ្រូ/អ្នកគ្រូ</p>
-          </motion.div>
-        )
-      )}
-    </div>
-  );
-}
+
+            {!started ? (
+              <div
+                className={`p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl relative ${cardBg}`}
+              >
+                <div className="text-6xl mb-4 animate-bounce">⚡</div>
+                <h1 className="text-xl md:text-2xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                  {appTitle}
+                </h1>
+                <p className={`text-xs mb-6 ${subText}`}>
+                  ⏱️ ២០ វិនាទីក្នុង ១ សំណួរ | ឆ្លើយត្រូវ
+                  និងលឿនជាងគេដើម្បីបានពាន!
+                </p>
+                <input
+                  type="text"
+                  placeholder="វាយឈ្មោះរបស់អ្នក..."
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && startStudentGame()}
+                  className={`w-full border rounded-xl p-3.5 text-center text-lg mb-4 focus:outline-none focus:border-purple-500 ${inputBg}`}
+                />
+                <button
+                  onClick={startStudentGame}
+                  disabled={!userName.trim()}
+                  className={`w-full py-3.5 rounded-xl font-bold transition shadow-lg ${
+                    userName.trim()
+                      ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30'
+                      : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                  }`}
+                >
+                  ចូលរួមប្រកួត 🚀
+                </button>
+
+                {/* ឈ្មោះអ្នកបង្កើតកម្មវិធី */}
+                <div className="mt-8 pt-4 border-t border-slate-800/60 flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                  <span>បង្កើតឡើងដោយ៖</span>
+                  <span className="font-bold text-amber-400">
+                    អ៊ាង យ៉ាឌីន ICTព្រៃវែង
+                  </span>
+                </div>
+              </div>
+            ) : currentQ < shuffledQuestions.length ? (
+              <div className="w-full max-w-xl flex flex-col gap-4">
+                <div
+                  className={`flex justify-between items-center border px-5 py-3 rounded-2xl ${cardBg}`}
+                >
+                  <span className="text-xs font-bold bg-purple-950 text-purple-300 border border-purple-800 px-3 py-1.5 rounded-full">
+                    សំណួរទី {currentQ + 1} / {shuffledQuestions.length}
+                  </span>
+
+                  <div
+                    className={`flex items-center gap-1.5 font-black text-lg ${
+                      timeLeft <= 5 ? 'timer-warn' : 'text-amber-400'
+                    }`}
+                  >
+                    <span>⏱️</span>
+                    <span>{timeLeft}s</span>
+                  </div>
+
+                  <span className="text-sm font-semibold">👤 {userName}</span>
+                </div>
+
+                <div
+                  className={`border p-6 md:p-8 rounded-3xl text-center shadow-xl min-h-[140px] flex items-center justify-center ${cardBg}`}
+                >
+                  <h2 className="text-lg md:text-xl font-bold leading-relaxed">
+                    {shuffledQuestions[currentQ].question}
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {shuffledQuestions[currentQ].options.map((opt, index) => {
+                    const color = kahootColors[index % 4];
+                    let extraStyle = `${color.bg} ${color.border} text-white`;
+
+                    if (answered) {
+                      if (opt === shuffledQuestions[currentQ].answer) {
+                        extraStyle =
+                          'bg-emerald-500 border-emerald-400 ring-4 ring-emerald-300 text-white scale-[1.02]';
+                      } else if (selectedOpt === opt) {
+                        extraStyle =
+                          'bg-rose-700 border-rose-600 opacity-60 text-white';
+                      } else {
+                        extraStyle = 'opacity-30 bg-slate-800 border-slate-700';
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => handleAnswer(opt)}
+                        disabled={answered}
+                        className={`p-5 rounded-2xl border-b-4 font-bold text-base flex items-center gap-3 transition-all active:scale-95 shadow-md ${extraStyle}`}
+                      >
+                        <span className="text-xl opacity-80">
+                          {color.shape}
+                        </span>
+                        <span className="text-left flex-1">{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div
+                className={`border p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl ${cardBg}`}
+              >
+                <div className="text-7xl mb-3 animate-pulse">🏆</div>
+                <h2 className="text-2xl font-black mb-1">
+                  អបអរសាទរ {userName}!
+                </h2>
+                <p className={`text-xs mb-4 ${subText}`}>
+                  អ្នកបានឆ្លើយចប់សំណួរទាំងអស់
+                </p>
+
+                <div
+                  className={`border p-5 rounded-2xl mb-4 ${
+                    isDark
+                      ? 'bg-slate-950 border-slate-800'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`text-xs uppercase tracking-widest font-bold ${subText}`}
+                  >
+                    ពិន្ទុទទួលបាន
+                  </span>
+                  <div className="text-4xl font-black text-amber-400 my-1">
+                    {score}{' '}
+                    <span className={`text-base font-normal ${subText}`}>
+                      ពិន្ទុ
+                    </span>
+                  </div>
+                  <span className="text-xs text-purple-400">
+                    ⏱️ ប្រើពេលសរុប៖ {totalTimeSpent} វិនាទី
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-purple-950/40 border border-purple-800/50 rounded-xl text-xs text-purple-300 leading-relaxed">
+                  📢 លទ្ធផលត្រូវបានបញ្ជូនទៅផ្ទាំងធំ (Podium) របស់គ្រូរួចរាល់ហើយ!
+                </div>
+
+                <div className="mt-6 pt-3 border-t border-slate-800/50 text-[11px] text-slate-500">
+                  កម្មវិធីរៀបចំដោយ៖{' '}
+                  <span className="font-bold text-amber-400">
+                    អ៊ាង យ៉ាឌីន ICTព្រៃវែង
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
