@@ -50,7 +50,6 @@
       const MQTT_TOPIC = "ict_preyveng_quiz_sync_live_v3";
       const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 
-      // មុខងារបំប្លែងកាលបរិច្ឆេទជាភាសាខ្មែរ Auto
       const getKhmerDateTime = () => {
         const now = new Date();
         const days = ['អាទិត្យ', 'ច័ន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
@@ -218,7 +217,6 @@
 
         const [editingQuestions, setEditingQuestions] = useState(() => activeQuestions);
         
-        // ពិន្ទុជុំបច្ចុប្បន្ន
         const [leaderboard, setLeaderboard] = useState(() => {
           try {
             const saved = localStorage.getItem('kahoot_board');
@@ -226,7 +224,6 @@
           } catch (e) { return []; }
         });
 
-        // ប្រវត្តិនៃការប្រកួតជុំមុនៗ (Match History Archive)
         const [historyList, setHistoryList] = useState(() => {
           try {
             const saved = localStorage.getItem('kahoot_history_archives');
@@ -237,7 +234,6 @@
         const [showImportModal, setShowImportModal] = useState(false);
         const [showPinModal, setShowPinModal] = useState(false);
         const [showHistoryModal, setShowHistoryModal] = useState(false);
-        const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
 
         const [bulkText, setBulkText] = useState('');
         const [oldPinInput, setOldPinInput] = useState('');
@@ -370,7 +366,6 @@
           sendMqttMessage("SET_TITLE", newTitle);
         };
 
-        // មុខងាររក្សាទុកទិន្នន័យចាស់ រួចចាប់ផ្តើមលេងជុំថ្មី (Archive & Start New Round)
         const handleStartNewRound = () => {
           if (leaderboard.length === 0) {
             return alert("មិនទាន់មានលទ្ធផលក្នុងជុំនេះសម្រាប់រក្សាទុកនៅឡើយទេ!");
@@ -392,16 +387,14 @@
             setHistoryList(updatedHistory);
             localStorage.setItem('kahoot_history_archives', JSON.stringify(updatedHistory));
 
-            // សម្អាតពិន្ទុជុំបច្ចុប្បន្នដើម្បីឱ្យសិស្សលេងជុំថ្មី
             setLeaderboard([]);
             localStorage.removeItem('kahoot_board');
             sendMqttMessage("CLEAR_SCORES", {});
 
-            alert("ជោគជ័យ! ទិន្នន័យជុំចាស់ត្រូវបានកត់ត្រាទុកក្នុងប្រវត្តិកម្រងរួចរាល់។ វេទិកាពានរង្វាន់បានត្រៀមរួចជាស្រេចសម្រាប់ជុំថ្មី!");
+            alert("ជោគជ័យ! ទិន្នន័យជុំចាស់ត្រូវបានកត់ត្រាទុកក្នុងប្រវត្តិកម្រងរួចរាល់។");
           }
         };
 
-        // មុខងារទាញយក Excel ពីតារាងណាមួយ (Current ឬ History)
         const exportTableToExcel = (dataList, customTitle, dateString) => {
           if (!dataList || dataList.length === 0) return alert("គ្មានទិន្នន័យសម្រាប់ទាញយកទេ!");
 
@@ -734,7 +727,6 @@
                       ⚙️ ផ្ទាំងកែសំណួរ ({editingQuestions.length})
                     </button>
                     
-                    {/* ប៊ូតុងបើកផ្ទាំងប្រវត្តិនៃការប្រកួត */}
                     <button
                       onClick={() => setShowHistoryModal(true)}
                       className="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
@@ -772,7 +764,6 @@
                       👁️‍🗨️ លាក់របារ
                     </button>
                     
-                    {/* ប៊ូតុងចាប់ផ្តើមជុំថ្មី (រក្សាទុកចាស់) */}
                     <button
                       onClick={handleStartNewRound}
                       className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-md transition flex items-center gap-1"
@@ -804,15 +795,14 @@
                       <span>⏰ ម៉ោង {liveDate.time}</span>
                     </div>
 
-                    <p className={`text-xs mt-2 ${subText}`}>
-                      ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ + ប្រើពេលតិចជាងគេ (លឿនជាងគេ) | 📡 Real-time Live
-                    </p>
+                    {/* បានដកអក្សរចោលតាមការស្នើសុំ */}
+
                     {leaderboard.length < 3 ? (
-                      <div className="inline-block mt-2 px-3 py-1 bg-purple-950/40 border border-purple-800/50 rounded-full text-[11px] text-purple-300 font-medium">
+                      <div className="inline-block mt-3 px-3 py-1 bg-purple-950/40 border border-purple-800/50 rounded-full text-[11px] text-purple-300 font-medium">
                         ⏳ កំពុងរង់ចាំអ្នកលេងគ្រប់ ៣ នាក់ ដើម្បីប្រកាសកាំជ្រួច និងសំឡេងជ័យជម្នះស្វ័យប្រវត្តិ ({leaderboard.length}/3)
                       </div>
                     ) : (
-                      <div className="inline-block mt-2 px-3 py-1 bg-emerald-950/40 border border-emerald-800/50 rounded-full text-[11px] text-emerald-400 font-bold">
+                      <div className="inline-block mt-3 px-3 py-1 bg-emerald-950/40 border border-emerald-800/50 rounded-full text-[11px] text-emerald-400 font-bold">
                         🎉 បានរកឃើញកំពូលអ្នកឈ្នះទាំង ៣ រូបពេញលេញហើយ!
                       </div>
                     )}
