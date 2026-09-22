@@ -14,8 +14,11 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- PubNub Global Realtime Cloud សម្រាប់ភ្ជាប់ទូរស័ព្ទសិស្សទៅកុំព្យូទ័រគ្រូឆ្លងអ៊ីនធឺណិត -->
-    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
+
+    <!-- Firebase SDK សម្រាប់ Sync ទិន្នន័យ Realtime ឆ្លងអ៊ីនធឺណិតគ្រប់ឧបករណ៍ -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
     <!-- Confetti / Fireworks -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
@@ -37,15 +40,22 @@
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useState, useEffect, useRef } = React;
+      const { useState, useEffect } = React;
 
-      // ឆានែលតភ្ជាប់ឆ្លងអ៊ីនធឺណិត (Online Realtime Room)
-      const QUIZ_CHANNEL = "ict_preyveng_quiz_room_2026";
-      const pubnub = new PubNub({
-        publishKey: "pub-c-8b898df5-3cbb-49e0-81f1-3bebfb992144",
-        subscribeKey: "sub-c-5eb0a7b4-ebda-4b36-a367-a068ca6011a0",
-        userId: "user_" + Math.random().toString(36).substring(2, 9)
-      });
+      // ការតភ្ជាប់ Firebase Cloud Database (Realtime Sync)
+      const firebaseConfig = {
+        databaseURL: "https://ict-quiz-sync-default-rtdb.asia-southeast1.firebasedatabase.app"
+      };
+      
+      let db = null;
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.database();
+      } catch (e) {
+        console.error("Firebase init error:", e);
+      }
 
       const playSound = (type) => {
         try {
@@ -150,26 +160,11 @@
         const [adminTab, setAdminTab] = useState('podium');
         const [hideHeader, setHideHeader] = useState(false);
         const [isDark, setIsDark] = useState(() => localStorage.getItem('quiz_theme') !== 'light');
-        const [appTitle, setAppTitle] = useState(() => localStorage.getItem('quiz_app_title') || 'តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
+        const [appTitle, setAppTitle] = useState('តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
 
-        const [activeQuestions, setActiveQuestions] = useState(() => {
-          try {
-            const saved = localStorage.getItem('active_quiz_questions');
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            }
-          } catch (e) {}
-          return DEFAULT_QUESTIONS;
-        });
-
-        const [editingQuestions, setEditingQuestions] = useState(() => activeQuestions);
-        const [leaderboard, setLeaderboard] = useState(() => {
-          try {
-            const saved = localStorage.getItem('kahoot_board');
-            return saved ? JSON.parse(saved) : [];
-          } catch (e) { return []; }
-        });
+        const [activeQuestions, setActiveQuestions] = useState(DEFAULT_QUESTIONS);
+        const [editingQuestions, setEditingQuestions] = useState(DEFAULT_QUESTIONS);
+        const [leaderboard, setLeaderboard] = useState([]);
 
         const [userName, setUserName] = useState('');
         const [started, setStarted] = useState(false);
@@ -188,35 +183,40 @@
           });
         };
 
-        // ទទួលទិន្នន័យពីគ្រប់ទូរស័ព្ទសិស្សតាម Online Cloud Realtime
+        // ស្តាប់ទិន្នន័យពី Firebase Realtime Database ផ្ទាល់
         useEffect(() => {
-          pubnub.subscribe({ channels: [QUIZ_CHANNEL] });
-          const listener = {
-            message: (msgEvent) => {
-              const event = msgEvent.message;
-              if (event?.type === 'NEW_SCORE') {
-                setLeaderboard((prev) => {
-                  // ការពារកុំឱ្យចូលឈ្មោះជាន់គ្នា
-                  const filtered = prev.filter(p => p.id !== event.payload.id);
-                  const updated = sortLeaderboard([...filtered, event.payload]);
-                  localStorage.setItem('kahoot_board', JSON.stringify(updated));
-                  if (updated.length === 3) triggerFireworks();
-                  return updated;
-                });
-              } else if (event?.type === 'RESET_SCORES') {
-                setLeaderboard([]);
-                localStorage.removeItem('kahoot_board');
-              } else if (event?.type === 'SET_ACTIVE_QUIZ') {
-                setActiveQuestions(event.payload);
-                setEditingQuestions(event.payload);
-                localStorage.setItem('active_quiz_questions', JSON.stringify(event.payload));
-              } else if (event?.type === 'SET_TITLE') {
-                setAppTitle(event.payload);
-                localStorage.setItem('quiz_app_title', event.payload);
-              }
+          if (!db) return;
+
+          // 1. Leaderboard Sync
+          const scoresRef = db.ref('quiz_session/scores');
+          scoresRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              const list = Object.values(data);
+              const sorted = sortLeaderboard(list);
+              setLeaderboard(sorted);
+              if (sorted.length === 3) triggerFireworks();
+            } else {
+              setLeaderboard([]);
             }
-          };
-          pubnub.addListener(listener);
+          });
+
+          // 2. Active Questions Sync
+          const questionsRef = db.ref('quiz_session/questions');
+          questionsRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data && Array.isArray(data) && data.length > 0) {
+              setActiveQuestions(data);
+              setEditingQuestions(data);
+            }
+          });
+
+          // 3. App Title Sync
+          const titleRef = db.ref('quiz_session/title');
+          titleRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) setAppTitle(data);
+          });
 
           const handleHash = () => setIsTeacher(checkIsTeacher());
           window.addEventListener('hashchange', handleHash);
@@ -224,8 +224,9 @@
           window.addEventListener('keydown', handleKey);
 
           return () => {
-            pubnub.removeListener(listener);
-            pubnub.unsubscribeAll();
+            scoresRef.off();
+            questionsRef.off();
+            titleRef.off();
             window.removeEventListener('hashchange', handleHash);
             window.removeEventListener('keydown', handleKey);
           };
@@ -257,8 +258,7 @@
 
         const handleTitleChange = (newTitle) => {
           setAppTitle(newTitle);
-          localStorage.setItem('quiz_app_title', newTitle);
-          pubnub.publish({ channel: QUIZ_CHANNEL, message: { type: 'SET_TITLE', payload: newTitle } });
+          if (db) db.ref('quiz_session/title').set(newTitle);
         };
 
         const handleAddNewQuestion = () => {
@@ -298,23 +298,19 @@
           setEditingQuestions(updated);
         };
 
-        // រក្សាទុក និងបញ្ជូនសំណួរទៅគ្រប់ទូរស័ព្ទសិស្សភ្លាមៗ
         const handleSaveAndActivate = () => {
           setActiveQuestions(editingQuestions);
-          localStorage.setItem('active_quiz_questions', JSON.stringify(editingQuestions));
-          pubnub.publish({
-            channel: QUIZ_CHANNEL,
-            message: { type: 'SET_ACTIVE_QUIZ', payload: editingQuestions }
-          });
+          if (db) {
+            db.ref('quiz_session/questions').set(editingQuestions);
+          }
           alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបាន Update ទៅទូរស័ព្ទសិស្សទាំងអស់រួចរាល់។`);
           setAdminTab('podium');
         };
 
         const handleClearScores = () => {
           if (confirm('តើចង់សម្អាតពិន្ទុដើម្បីចាប់ផ្តើមជុំថ្មីមែនទេ?')) {
+            if (db) db.ref('quiz_session/scores').remove();
             setLeaderboard([]);
-            localStorage.removeItem('kahoot_board');
-            pubnub.publish({ channel: QUIZ_CHANNEL, message: { type: 'RESET_SCORES' } });
           }
         };
 
@@ -322,11 +318,7 @@
           if (confirm('តើអ្នកចង់ទាញយកសំណួរគំរូដើមទាំង ៥ មកវិញមែនទេ?')) {
             setEditingQuestions(DEFAULT_QUESTIONS);
             setActiveQuestions(DEFAULT_QUESTIONS);
-            localStorage.setItem('active_quiz_questions', JSON.stringify(DEFAULT_QUESTIONS));
-            pubnub.publish({
-              channel: QUIZ_CHANNEL,
-              message: { type: 'SET_ACTIVE_QUIZ', payload: DEFAULT_QUESTIONS }
-            });
+            if (db) db.ref('quiz_session/questions').set(DEFAULT_QUESTIONS);
             alert('បានទាញយកសំណួរដើមមកវិញជោគជ័យ!');
           }
         };
@@ -384,7 +376,6 @@
           setTimeout(() => nextQuestion(newScore, newTotalTime), 1200);
         };
 
-        // ពេលឆ្លើយចប់ បញ្ជូនពិន្ទុឡើង Cloud ទៅកុំព្យូទ័រគ្រូ Real-time
         const nextQuestion = (finalScore, finalTotalTime) => {
           setAnswered(false);
           setSelectedOpt(null);
@@ -395,18 +386,18 @@
           } else {
             setCurrentQ(shuffledQuestions.length);
 
+            const playerId = "std_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
             const playerData = {
-              id: Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+              id: playerId,
               name: userName,
               score: finalScore,
               timeSpent: finalTotalTime,
             };
 
-            // Publish ទៅ Cloud ឱ្យកុំព្យូទ័រគ្រូឃើញភ្លាមៗ
-            pubnub.publish({
-              channel: QUIZ_CHANNEL,
-              message: { type: 'NEW_SCORE', payload: playerData }
-            });
+            // បញ្ជូនពិន្ទុឡើង Firebase Realtime Database
+            if (db) {
+              db.ref('quiz_session/scores/' + playerId).set(playerData);
+            }
           }
         };
 
@@ -540,7 +531,7 @@
                       🏆 {appTitle}
                     </h1>
                     <p className={`text-xs mt-1 ${subText}`}>
-                      ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ + ប្រើពេលតិចជាងគេ (លឿនជាងគេ) | 📡 Real-time Sync Online
+                      ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ + ប្រើពេលតិចជាងគេ (លឿនជាងគេ) | 🟢 Cloud Real-time ភ្ជាប់ជោគជ័យ
                     </p>
                     {leaderboard.length < 3 ? (
                       <div className="inline-block mt-2 px-3 py-1 bg-purple-950/40 border border-purple-800/50 rounded-full text-[11px] text-purple-300 font-medium">
