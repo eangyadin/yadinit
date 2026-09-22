@@ -73,6 +73,7 @@
 
         return {
           fullDate: `ថ្ងៃ${dayName} ទី${date} ខែ${monthName} ឆ្នាំ${year}`,
+          shortDate: `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`,
           time: `${toKhmerNum(hours)}:${toKhmerNum(minutes)} ${period}`
         };
       };
@@ -197,7 +198,6 @@
         const [isDark, setIsDark] = useState(() => localStorage.getItem('quiz_theme') !== 'light');
         const [appTitle, setAppTitle] = useState(() => localStorage.getItem('quiz_app_title') || 'តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
 
-        // កាលបរិច្ឆេទបច្ចុប្បន្ន Auto
         const [liveDate, setLiveDate] = useState(getKhmerDateTime());
 
         useEffect(() => {
@@ -394,6 +394,41 @@
           setEditingQuestions(updated);
         };
 
+        // មុខងារទាញយកទិន្នន័យជា Excel (.csv / .xlsx) គាំទ្រអក្សរខ្មែរ ១០០%
+        const handleExportToExcel = () => {
+          if (leaderboard.length === 0) return alert("មិនទាន់មានទិន្នន័យសិស្សចូលលេងសម្រាប់ទាញយកទេ!");
+
+          let csvContent = "\uFEFF"; // UTF-8 BOM ដើម្បីកុំឱ្យបែកពុម្ពអក្សរខ្មែរក្នុង Excel
+          csvContent += `របាយការណ៍លទ្ធផល៖ ${appTitle}\n`;
+          csvContent += `កាលបរិច្ឆេទ៖ ${liveDate.fullDate}\n`;
+          csvContent += `រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង\n\n`;
+          
+          // ក្បាលតារាង Excel
+          csvContent += "ចំណាត់ថ្នាក់,ឈ្មោះសិស្ស,ពិន្ទុ (Score),រយៈពេលឆ្លើយ (វិនាទី),ម៉ោងឆ្លើយចប់,កាលបរិច្ឆេទ\n";
+
+          // បញ្ចូលជួរដេកតាមសិស្សនីមួយៗ
+          leaderboard.forEach((item, index) => {
+            const rank = index + 1;
+            const name = `"${item.name.replace(/"/g, '""')}"`;
+            const scoreVal = item.score;
+            const timeSpent = item.timeSpent;
+            const timeSub = `"${item.submittedTime || liveDate.time}"`;
+            const dateSub = `"${item.submittedDate || liveDate.shortDate}"`;
+
+            csvContent += `${rank},${name},${scoreVal},${timeSpent},${timeSub},${dateSub}\n`;
+          });
+
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.setAttribute("href", url);
+          link.setAttribute("download", `លទ្ធផល_${appTitle}_${liveDate.shortDate}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        };
+
         // ទាញយក Word មានកាលបរិច្ឆេទ Auto
         const handleExportToWord = () => {
           if (editingQuestions.length === 0) return alert("គ្មានសំណួរសម្រាប់ទាញយកទេ!");
@@ -443,7 +478,7 @@
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `${appTitle}_${liveDate.time}.doc`;
+          link.download = `${appTitle}_${liveDate.shortDate}.doc`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -492,7 +527,7 @@
         };
 
         const handleClearScores = () => {
-          if (confirm("តើចង់សម្អាតពិន្ទុដើម្បីចាប់ផ្តើមជុំថ្មីមែនទេ?")) {
+          if (confirm("តើចង់សម្អាតពិន្ទុដើម្បីចាប់ផ្តើមជុំថ្មីមែនទេ? (លោកគ្រូអាចទាញយក Excel ទុកជាមុនសិន)")) {
             setLeaderboard([]);
             localStorage.removeItem("kahoot_board");
             sendMqttMessage("CLEAR_SCORES", {});
@@ -562,12 +597,14 @@
           } else {
             setCurrentQ(shuffledQuestions.length);
 
+            const curDateInfo = getKhmerDateTime();
             const playerData = {
               id: Date.now() + "_" + Math.random().toString(36).substring(2, 6),
               name: userName,
               score: finalScore,
               timeSpent: finalTotalTime,
-              submittedTime: getKhmerDateTime().time // កត់ត្រាម៉ោងឆ្លើយចប់ Auto
+              submittedTime: curDateInfo.time,
+              submittedDate: curDateInfo.shortDate // កត់ត្រាកាលបរិច្ឆេទថ្ងៃប្រកួត Auto សម្រាប់ Excel
             };
 
             sendMqttMessage("NEW_SCORE", playerData);
@@ -717,7 +754,6 @@
                       🏆 {appTitle}
                     </h1>
 
-                    {/* បង្ហាញកាលបរិច្ឆេទថ្ងៃប្រកួត Auto */}
                     <div className="inline-flex items-center gap-2 mt-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs text-amber-300 font-medium">
                       <span>📅 {liveDate.fullDate}</span>
                       <span>•</span>
@@ -774,11 +810,25 @@
                     </div>
                   </div>
 
+                  {/* តារាងលទ្ធផលសិស្សទាំងអស់ + ប៊ូតុង Export Excel */}
                   <div className={`border rounded-2xl p-5 shadow-xl ${cardBg}`}>
-                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${subText}`}>
-                      អ្នកចូលរួមទាំងអស់ ({leaderboard.length} នាក់)
-                    </h3>
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    <div className="flex flex-wrap justify-between items-center gap-3 mb-3 border-b pb-3 border-slate-800">
+                      <h3 className={`text-xs font-bold uppercase tracking-wider ${subText}`}>
+                        អ្នកចូលរួមទាំងអស់ ({leaderboard.length} នាក់)
+                      </h3>
+
+                      {/* ប៊ូតុងទាញយកជា Excel */}
+                      <button
+                        onClick={handleExportToExcel}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs shadow-md transition flex items-center gap-1.5 active:scale-95"
+                        title="ទាញយកទិន្នន័យសិស្សទាំងអស់ជាឯកសារ Excel"
+                      >
+                        <span>📊</span>
+                        <span>ទាញយកជា Excel</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {leaderboard.length === 0 ? (
                         <p className={`text-center py-6 text-sm ${subText}`}>មិនទាន់មានសិស្សឆ្លើយចប់នៅឡើយទេ...</p>
                       ) : (
@@ -1022,7 +1072,7 @@
         }
 
         // =========================================================================
-        // ផ្ទាំងសិស្សចូលលេង (បង្ហាញថ្ងៃ & ម៉ោង Auto ពេលសិស្សចូលលេង)
+        // ផ្ទាំងសិស្សចូលលេង
         // =========================================================================
         return (
           <div className={`flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 relative ${themeBg}`}>
@@ -1043,7 +1093,6 @@
                   {appTitle}
                 </h1>
 
-                {/* កាលបរិច្ឆេទ Auto លើផ្ទាំងសិស្ស */}
                 <div className="text-[11px] text-amber-400 font-medium mb-2">
                   📅 {liveDate.fullDate}
                 </div>
