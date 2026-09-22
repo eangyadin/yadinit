@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>តេស្តកញ្ចប់អំណាន - អ៊ាង យ៉ាឌីន ICTព្រៃវែង</title>
-    <!-- បិទ Cache ដាច់ខាត -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -39,6 +38,23 @@
         animation: pulse-timer 0.6s infinite;
         color: #ef4444 !important;
       }
+
+      /* Animations សម្រាប់ Podium និង Reveal */
+      @keyframes popIn {
+        0% { transform: scale(0.3) translateY(60px); opacity: 0; }
+        70% { transform: scale(1.08) translateY(-8px); opacity: 1; }
+        100% { transform: scale(1) translateY(0); opacity: 1; }
+      }
+      @keyframes glowGold {
+        0%, 100% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.4), inset 0 0 15px rgba(254, 240, 138, 0.5); }
+        50% { box-shadow: 0 0 45px rgba(245, 158, 11, 0.8), inset 0 0 25px rgba(254, 240, 138, 0.8); }
+      }
+      .animate-pop-in {
+        animation: popIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      .gold-podium-glow {
+        animation: glowGold 2s infinite ease-in-out;
+      }
     </style>
   </head>
   <body class="min-h-screen">
@@ -50,7 +66,6 @@
       const MQTT_TOPIC = "ict_preyveng_quiz_sync_live_v3";
       const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 
-      // មុខងារបំប្លែងកាលបរិច្ឆេទជាភាសាខ្មែរ Auto
       const getKhmerDateTime = () => {
         const now = new Date();
         const days = ['អាទិត្យ', 'ច័ន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
@@ -113,6 +128,18 @@
             gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
             osc.start();
             osc.stop(ctx.currentTime + 0.3);
+          } else if (type === 'drumroll') {
+            // សំឡេងស្គររោទ៍រង់ចាំប្រកាស
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(120, ctx.currentTime);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.9);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.9);
           } else if (type === 'victory') {
             const notes = [
               { f: 523.25, d: 0.15, t: 0 },
@@ -124,7 +151,7 @@
               { f: 783.99, d: 0.7, t: 1.25 },
               { f: 659.25, d: 0.2, t: 2.0 },
               { f: 783.99, d: 0.2, t: 2.2 },
-              { f: 1046.50, d: 1.2, t: 2.4 }
+              { f: 1046.50, d: 1.4, t: 2.4 }
             ];
             notes.forEach((item) => {
               const osc = ctx.createOscillator();
@@ -142,17 +169,17 @@
         } catch (e) {}
       };
 
-      const triggerFireworks = () => {
+      const triggerGrandFireworks = () => {
         playSound('victory');
-        const duration = 4.5 * 1000;
+        const duration = 5 * 1000;
         const animationEnd = Date.now() + duration;
-        const defaults = { startVelocity: 40, spread: 360, ticks: 80, zIndex: 1000 };
+        const defaults = { startVelocity: 45, spread: 360, ticks: 100, zIndex: 1000 };
         const randomInRange = (min, max) => Math.random() * (max - min) + min;
 
         const interval = setInterval(() => {
           const timeLeft = animationEnd - Date.now();
           if (timeLeft <= 0) return clearInterval(interval);
-          const particleCount = 70 * (timeLeft / duration);
+          const particleCount = 80 * (timeLeft / duration);
           confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
           confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
         }, 220);
@@ -232,6 +259,10 @@
           } catch (e) { return []; }
         });
 
+        // ដំណាក់កាលប្រកាសអ្នកឈ្នះ (0=លាក់, 1=បង្ហាញលេខ៣, 2=បង្ហាញលេខ២, 3=បង្ហាញលេខ១ ពេញលេញ)
+        const [podiumRevealStep, setPodiumRevealStep] = useState(0);
+        const [isRevealing, setIsRevealing] = useState(false);
+
         const [showImportModal, setShowImportModal] = useState(false);
         const [showPinModal, setShowPinModal] = useState(false);
         const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -286,11 +317,11 @@
                   const filtered = prev.filter((p) => p.id !== packet.payload.id);
                   const updated = sortLeaderboard([...filtered, packet.payload]);
                   localStorage.setItem("kahoot_board", JSON.stringify(updated));
-                  if (updated.length === 3) triggerFireworks();
                   return updated;
                 });
               } else if (packet.type === "CLEAR_SCORES") {
                 setLeaderboard([]);
+                setPodiumRevealStep(0);
                 localStorage.removeItem("kahoot_board");
               } else if (packet.type === "SET_QUESTIONS") {
                 setActiveQuestions(packet.payload);
@@ -347,6 +378,36 @@
           window.location.hash = "";
         };
 
+        // មុខងារប្រកាសជ័យលាភី Top 3 តាមលំដាប់លំដោយរំភើបអស្ចារ្យ
+        const handleTriggerReveal = () => {
+          if (leaderboard.length < 3) {
+            return alert(`ត្រូវការសិស្សយ៉ាងហោចណាស់ ៣ នាក់ដើម្បីប្រកាសជ័យលាភី! (បច្ចុប្បន្នទើបមាន ${leaderboard.length} នាក់)`);
+          }
+
+          setIsRevealing(true);
+          setPodiumRevealStep(0);
+
+          // ជំហានទី ១៖ បង្ហាញលេខ ៣ (ក្រោយ ២ វិនាទី)
+          playSound('drumroll');
+          setTimeout(() => {
+            setPodiumRevealStep(1);
+            playSound('correct');
+          }, 1800);
+
+          // ជំហានទី ២៖ បង្ហាញលេខ ២ (ក្រោយ ៤ វិនាទី)
+          setTimeout(() => {
+            setPodiumRevealStep(2);
+            playSound('correct');
+          }, 3800);
+
+          // ជំហានទី ៣៖ បង្ហាញលេខ ១ ជើងឯក + កាំជ្រួចធំ + ភ្លេងជ័យជម្នះ (ក្រោយ ៦ វិនាទី)
+          setTimeout(() => {
+            setPodiumRevealStep(3);
+            setIsRevealing(false);
+            triggerGrandFireworks();
+          }, 6000);
+        };
+
         const handleChangePin = () => {
           if (oldPinInput !== currentPin) return alert("លេខសម្ងាត់ចាស់មិនត្រឹមត្រូវទេ!");
           if (!newPinInput.trim() || newPinInput.length < 4) return alert("លេខសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច ៤ ខ្ទង់ឡើងទៅ!");
@@ -389,6 +450,7 @@
             localStorage.setItem('kahoot_history_archives', JSON.stringify(updatedHistory));
 
             setLeaderboard([]);
+            setPodiumRevealStep(0);
             localStorage.removeItem('kahoot_board');
             sendMqttMessage("CLEAR_SCORES", {});
 
@@ -790,42 +852,87 @@
                       🏆 {appTitle}
                     </h1>
 
-                    {/* បង្ហាញតែថ្ងៃខែឆ្នាំ Auto សុទ្ធសាធ (ដកម៉ោង និងដកប្រអប់រង់ចាំចេញរួចរាល់) */}
                     <div className="inline-flex items-center gap-2 mt-2 px-4 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs text-amber-300 font-semibold shadow-sm">
                       <span>📅 {liveDate.fullDate}</span>
                     </div>
+
+                    {/* ប៊ូតុងរំភើបអស្ចារ្យ សម្រាប់គ្រូចុចប្រកាសអ្នកឈ្នះ Top 3 ពេលសិស្សធ្វើចប់គ្រប់គ្នា */}
+                    <div className="mt-4">
+                      {podiumRevealStep < 3 ? (
+                        <button
+                          onClick={handleTriggerReveal}
+                          disabled={isRevealing || leaderboard.length < 3}
+                          className={`px-6 py-3 rounded-2xl font-black text-sm transition-all shadow-xl flex items-center gap-2 mx-auto ${
+                            leaderboard.length >= 3 && !isRevealing
+                              ? "bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 hover:from-amber-400 hover:to-pink-400 text-slate-950 scale-105 animate-bounce"
+                              : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
+                          }`}
+                        >
+                          <span>{isRevealing ? "🥁 កំពុងរៀបចំប្រកាស..." : "👑 ប្រកាសជ័យលាភី Top 3 (Reveal Podium)"}</span>
+                          <span className="text-xs bg-slate-950/40 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                            {leaderboard.length} នាក់បានឆ្លើយចប់
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-xs text-emerald-400 font-bold animate-pulse">
+                          <span>🎉 បានប្រកាសជ័យលាភីកំពូលទាំង ៣ រូបរួចរាល់!</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
+                  {/* វេទិកា PODIUM បែប ANIMATION រស់រវើក និងទាន់សម័យ */}
                   <div className="flex justify-center items-end gap-3 md:gap-6 max-w-2xl mx-auto h-64 mb-10">
-                    {/* លេខ ២ */}
+                    {/* លេខ ២ (បង្ហាញនៅជំហានទី ២) */}
                     <div className="flex-1 flex flex-col items-center">
-                      <div className="text-sm font-bold truncate max-w-[100px] mb-1">{top2 ? top2.name : "..."}</div>
-                      <div className={`text-xs mb-0.5 ${subText}`}>{top2 ? `${top2.score} ពិន្ទុ` : ""}</div>
-                      <div className="text-[11px] text-purple-400 font-semibold mb-2">{top2 ? `⏱️ ${top2.timeSpent}s` : ""}</div>
-                      <div className="w-full bg-gradient-to-t from-slate-700 to-slate-500 rounded-t-2xl h-36 flex flex-col items-center justify-center border-t-4 border-slate-300 shadow-xl">
+                      {podiumRevealStep >= 2 ? (
+                        <div className="flex flex-col items-center animate-pop-in">
+                          <div className="text-sm font-black truncate max-w-[100px] mb-1 text-slate-200">{top2?.name}</div>
+                          <div className="text-xs text-slate-400 mb-0.5 font-bold">{top2?.score} ពិន្ទុ</div>
+                          <div className="text-[11px] text-purple-400 font-semibold mb-2">⏱️ {top2?.timeSpent}s</div>
+                        </div>
+                      ) : (
+                        <div className="h-14 flex items-center justify-center text-xl text-slate-600 font-black">? ? ?</div>
+                      )}
+                      <div className={`w-full bg-gradient-to-t from-slate-700 to-slate-500 rounded-t-2xl flex flex-col items-center justify-center border-t-4 border-slate-300 shadow-xl transition-all duration-700 ${podiumRevealStep >= 2 ? 'h-36' : 'h-24 opacity-60'}`}>
                         <span className="text-3xl">🥈</span>
                         <span className="text-xl font-black text-white mt-1">2</span>
                       </div>
                     </div>
 
-                    {/* លេខ ១ */}
+                    {/* លេខ ១ ជើងឯក (បង្ហាញចុងក្រោយបង្អស់ ជាមួយ Glow មាស និងម្កុដរលោង) */}
                     <div className="flex-1 flex flex-col items-center">
-                      <span className="text-3xl animate-bounce">👑</span>
-                      <div className="text-base font-black text-amber-400 truncate max-w-[120px] mb-1">{top1 ? top1.name : "..."}</div>
-                      <div className="text-xs text-amber-400 font-bold mb-0.5">{top1 ? `${top1.score} ពិន្ទុ` : ""}</div>
-                      <div className="text-[11px] text-amber-300 font-bold mb-2">{top1 ? `⏱️ ប្រើពេល ${top1.timeSpent}s` : ""}</div>
-                      <div className="w-full bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-2xl h-48 flex flex-col items-center justify-center border-t-4 border-yellow-200 shadow-2xl shadow-amber-500/40">
+                      {podiumRevealStep >= 3 ? (
+                        <div className="flex flex-col items-center animate-pop-in">
+                          <span className="text-4xl animate-bounce drop-shadow-[0_0_15px_rgba(245,158,11,0.8)]">👑</span>
+                          <div className="text-base font-black text-amber-400 truncate max-w-[120px] mb-1 drop-shadow-md">{top1?.name}</div>
+                          <div className="text-xs text-amber-300 font-bold mb-0.5">{top1?.score} ពិន្ទុ</div>
+                          <div className="text-[11px] text-amber-200 font-bold mb-2">⏱️ {top1?.timeSpent}s</div>
+                        </div>
+                      ) : (
+                        <div className="h-16 flex flex-col items-center justify-center text-amber-500/60 font-black">
+                          <span className="text-2xl animate-pulse">👑</span>
+                          <span className="text-xs mt-1">រង់ចាំជើងឯក</span>
+                        </div>
+                      )}
+                      <div className={`w-full bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-2xl flex flex-col items-center justify-center border-t-4 border-yellow-200 shadow-2xl transition-all duration-700 ${podiumRevealStep >= 3 ? 'h-48 gold-podium-glow' : 'h-28 opacity-60'}`}>
                         <span className="text-4xl">🥇</span>
                         <span className="text-2xl font-black text-slate-950 mt-1">1</span>
                       </div>
                     </div>
 
-                    {/* លេខ ៣ */}
+                    {/* លេខ ៣ (បង្ហាញមុនគេបង្អស់នៅជំហានទី ១) */}
                     <div className="flex-1 flex flex-col items-center">
-                      <div className="text-sm font-bold text-amber-600 truncate max-w-[100px] mb-1">{top3 ? top3.name : "..."}</div>
-                      <div className={`text-xs mb-0.5 ${subText}`}>{top3 ? `${top3.score} ពិន្ទុ` : ""}</div>
-                      <div className="text-[11px] text-purple-400 font-semibold mb-2">{top3 ? `⏱️ ${top3.timeSpent}s` : ""}</div>
-                      <div className="w-full bg-gradient-to-t from-amber-900 to-amber-700 rounded-t-2xl h-28 flex flex-col items-center justify-center border-t-4 border-amber-600 shadow-lg">
+                      {podiumRevealStep >= 1 ? (
+                        <div className="flex flex-col items-center animate-pop-in">
+                          <div className="text-sm font-black text-amber-600 truncate max-w-[100px] mb-1">{top3?.name}</div>
+                          <div className="text-xs text-slate-400 mb-0.5 font-bold">{top3?.score} ពិន្ទុ</div>
+                          <div className="text-[11px] text-purple-400 font-semibold mb-2">⏱️ {top3?.timeSpent}s</div>
+                        </div>
+                      ) : (
+                        <div className="h-14 flex items-center justify-center text-xl text-slate-600 font-black">? ? ?</div>
+                      )}
+                      <div className={`w-full bg-gradient-to-t from-amber-900 to-amber-700 rounded-t-2xl flex flex-col items-center justify-center border-t-4 border-amber-600 shadow-lg transition-all duration-700 ${podiumRevealStep >= 1 ? 'h-28' : 'h-20 opacity-60'}`}>
                         <span className="text-3xl">🥉</span>
                         <span className="text-xl font-black text-white mt-1">3</span>
                       </div>
