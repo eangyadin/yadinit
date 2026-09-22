@@ -20,7 +20,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- MQTT Broker សម្រាប់ Sync ទិន្នន័យ Realtime -->
+    <!-- MQTT Broker សម្រាប់ Sync Realtime -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <!-- Confetti / Fireworks -->
@@ -49,6 +49,33 @@
 
       const MQTT_TOPIC = "ict_preyveng_quiz_sync_live_v3";
       const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
+
+      // មុខងារបំប្លែងកាលបរិច្ឆេទជាភាសាខ្មែរ Auto
+      const getKhmerDateTime = () => {
+        const now = new Date();
+        const days = ['អាទិត្យ', 'ច័ន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
+        const months = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
+        const toKhmerNum = (num) => {
+          const khNums = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+          return num.toString().split('').map(d => khNums[d] !== undefined ? khNums[d] : d).join('');
+        };
+
+        const dayName = days[now.getDay()];
+        const date = toKhmerNum(now.getDate());
+        const monthName = months[now.getMonth()];
+        const year = toKhmerNum(now.getFullYear());
+        
+        let hours = now.getHours();
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const period = hours >= 12 ? 'រសៀល' : 'ព្រឹក';
+        if (hours > 12) hours -= 12;
+        if (hours === 0) hours = 12;
+
+        return {
+          fullDate: `ថ្ងៃ${dayName} ទី${date} ខែ${monthName} ឆ្នាំ${year}`,
+          time: `${toKhmerNum(hours)}:${toKhmerNum(minutes)} ${period}`
+        };
+      };
 
       const playSound = (type) => {
         try {
@@ -163,17 +190,20 @@
 
         const [isTeacher, setIsTeacher] = useState(checkIsTeacher);
         const [adminPassInput, setAdminPassInput] = useState('');
-        
-        // លេខសម្ងាត់រក្សាទុកក្នុង LocalStorage (លេខដើម: 1234)
-        const [currentPin, setCurrentPin] = useState(() => {
-          return localStorage.getItem('quiz_teacher_pin') || '1234';
-        });
-
+        const [currentPin, setCurrentPin] = useState(() => localStorage.getItem('quiz_teacher_pin') || '1234');
         const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [adminTab, setAdminTab] = useState('podium');
         const [hideHeader, setHideHeader] = useState(false);
         const [isDark, setIsDark] = useState(() => localStorage.getItem('quiz_theme') !== 'light');
         const [appTitle, setAppTitle] = useState(() => localStorage.getItem('quiz_app_title') || 'តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
+
+        // កាលបរិច្ឆេទបច្ចុប្បន្ន Auto
+        const [liveDate, setLiveDate] = useState(getKhmerDateTime());
+
+        useEffect(() => {
+          const timer = setInterval(() => setLiveDate(getKhmerDateTime()), 10000);
+          return () => clearInterval(timer);
+        }, []);
 
         const [activeQuestions, setActiveQuestions] = useState(() => {
           try {
@@ -197,8 +227,6 @@
         const [showImportModal, setShowImportModal] = useState(false);
         const [showPinModal, setShowPinModal] = useState(false);
         const [bulkText, setBulkText] = useState('');
-        
-        // State សម្រាប់ផ្ទាំងប្តូរលេខកូដ
         const [oldPinInput, setOldPinInput] = useState('');
         const [newPinInput, setNewPinInput] = useState('');
         const [confirmPinInput, setConfirmPinInput] = useState('');
@@ -309,17 +337,10 @@
           window.location.hash = "";
         };
 
-        // មុខងារប្តូរលេខកូដសម្ងាត់
         const handleChangePin = () => {
-          if (oldPinInput !== currentPin) {
-            return alert("លេខសម្ងាត់ចាស់មិនត្រឹមត្រូវទេ!");
-          }
-          if (!newPinInput.trim() || newPinInput.length < 4) {
-            return alert("លេខសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច ៤ ខ្ទង់ឡើងទៅ!");
-          }
-          if (newPinInput !== confirmPinInput) {
-            return alert("ការផ្ទៀងផ្ទាត់លេខសម្ងាត់ថ្មីមិនត្រូវគ្នាទេ!");
-          }
+          if (oldPinInput !== currentPin) return alert("លេខសម្ងាត់ចាស់មិនត្រឹមត្រូវទេ!");
+          if (!newPinInput.trim() || newPinInput.length < 4) return alert("លេខសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច ៤ ខ្ទង់ឡើងទៅ!");
+          if (newPinInput !== confirmPinInput) return alert("ការផ្ទៀងផ្ទាត់លេខសម្ងាត់ថ្មីមិនត្រូវគ្នាទេ!");
 
           setCurrentPin(newPinInput);
           localStorage.setItem('quiz_teacher_pin', newPinInput);
@@ -327,7 +348,7 @@
           setOldPinInput('');
           setNewPinInput('');
           setConfirmPinInput('');
-          alert("ជោគជ័យ! លេខសម្ងាត់ថ្មីត្រូវបានរក្សាទុករួចរាល់។ សូមចងចាំលេខកូដនេះសម្រាប់ការចូលលើកក្រោយ!");
+          alert("ជោគជ័យ! លេខសម្ងាត់ថ្មីត្រូវបានរក្សាទុក!");
         };
 
         const handleTitleChange = (newTitle) => {
@@ -373,6 +394,7 @@
           setEditingQuestions(updated);
         };
 
+        // ទាញយក Word មានកាលបរិច្ឆេទ Auto
         const handleExportToWord = () => {
           if (editingQuestions.length === 0) return alert("គ្មានសំណួរសម្រាប់ទាញយកទេ!");
 
@@ -383,16 +405,20 @@
               <title>${appTitle}</title>
               <style>
                 body { font-family: 'Kantumruy Pro', 'Khmer OS Siemreap', Arial, sans-serif; line-height: 1.6; }
-                h2 { text-align: center; color: #1e3a8a; }
-                .q-item { margin-bottom: 20px; }
-                .q-title { font-weight: bold; font-size: 14pt; }
+                h2 { text-align: center; color: #1e3a8a; margin-bottom: 2px; }
+                .meta { text-align: center; font-size: 11pt; color: #4b5563; margin-bottom: 20px; }
+                .q-item { margin-bottom: 18px; }
+                .q-title { font-weight: bold; font-size: 13pt; }
                 .opt-list { margin-left: 20px; }
                 .correct { color: #047857; font-weight: bold; }
               </style>
             </head>
             <body>
               <h2>កម្រងសំណួរ៖ ${appTitle}</h2>
-              <p style="text-align:center; font-size:11pt; color:#6b7280;">រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង | សរុប ${editingQuestions.length} សំណួរ</p>
+              <div class="meta">
+                📅 កាលបរិច្ឆេទ៖ ${liveDate.fullDate} (ម៉ោង ${liveDate.time})<br/>
+                ✍️ រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង | សរុប ${editingQuestions.length} សំណួរ
+              </div>
               <hr/>
           `;
 
@@ -417,7 +443,7 @@
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `${appTitle}_សំណួរ.doc`;
+          link.download = `${appTitle}_${liveDate.time}.doc`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -433,18 +459,12 @@
 
           lines.forEach(line => {
             const isQuestion = /^(សំណួរ|\d+[\.\)\:\-]|Question)/i.test(line) || (!currentItem && line.endsWith("?"));
-            
             if (isQuestion || (currentItem && currentItem.options.length >= 4)) {
               if (currentItem && currentItem.options.length >= 2) {
                 parsed.push(currentItem);
               }
               const cleanQ = line.replace(/^(សំណួរ\s*\d*[\.\:\-]*|\d+[\.\)\:\-]*)\s*/i, "").trim();
-              currentItem = {
-                id: Date.now() + Math.random(),
-                question: cleanQ || line,
-                options: [],
-                answer: ""
-              };
+              currentItem = { id: Date.now() + Math.random(), question: cleanQ || line, options: [], answer: "" };
             } else if (currentItem) {
               const cleanOpt = line.replace(/^([a-dA-Dក-ឃ១-៤][\.\)\:\-]|[-*•])\s*/i, "").trim();
               if (cleanOpt) {
@@ -454,25 +474,20 @@
             }
           });
 
-          if (currentItem && currentItem.options.length >= 2) {
-            parsed.push(currentItem);
-          }
-
-          if (parsed.length === 0) {
-            return alert("ប្រព័ន្ធរកមិនឃើញទម្រង់សំណួរត្រឹមត្រូវទេ!");
-          }
+          if (currentItem && currentItem.options.length >= 2) parsed.push(currentItem);
+          if (parsed.length === 0) return alert("ប្រព័ន្ធរកមិនឃើញទម្រង់សំណួរត្រឹមត្រូវទេ!");
 
           setEditingQuestions(parsed);
           setShowImportModal(false);
           setBulkText('');
-          alert(`ជោគជ័យ! បានទាញយកសំណួរចំនួន ${parsed.length} សំណួររួចរាល់។ សូមពិនិត្យ និងចុចរើសចម្លើយត្រឹមត្រូវ (Radio Button) រួចចុច Save!`);
+          alert(`ជោគជ័យ! បានទាញយកសំណួរចំនួន ${parsed.length} សំណួររួចរាល់។`);
         };
 
         const handleSaveAndActivate = () => {
           setActiveQuestions(editingQuestions);
           localStorage.setItem("active_quiz_questions", JSON.stringify(editingQuestions));
           sendMqttMessage("SET_QUESTIONS", editingQuestions);
-          alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបានផ្សាយឡើង Cloud រួចរាល់។ សិស្សនៅលើទូរស័ព្ទគ្រាន់តែចុច Refresh នឹងឃើញសំណួរថ្មីភ្លាមៗ!`);
+          alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបានផ្សាយឡើង Cloud រួចរាល់។`);
           setAdminTab("podium");
         };
 
@@ -481,16 +496,6 @@
             setLeaderboard([]);
             localStorage.removeItem("kahoot_board");
             sendMqttMessage("CLEAR_SCORES", {});
-          }
-        };
-
-        const handleRestoreDefault = () => {
-          if (confirm("តើអ្នកចង់ទាញយកសំណួរគំរូដើមមកវិញមែនទេ?")) {
-            setEditingQuestions(DEFAULT_QUESTIONS);
-            setActiveQuestions(DEFAULT_QUESTIONS);
-            localStorage.setItem("active_quiz_questions", JSON.stringify(DEFAULT_QUESTIONS));
-            sendMqttMessage("SET_QUESTIONS", DEFAULT_QUESTIONS);
-            alert("បានទាញយកសំណួរដើមមកវិញជោគជ័យ!");
           }
         };
 
@@ -562,6 +567,7 @@
               name: userName,
               score: finalScore,
               timeSpent: finalTotalTime,
+              submittedTime: getKhmerDateTime().time // កត់ត្រាម៉ោងឆ្លើយចប់ Auto
             };
 
             sendMqttMessage("NEW_SCORE", playerData);
@@ -666,7 +672,6 @@
                       {cloudStatus}
                     </span>
                     
-                    {/* ប៊ូតុងប្តូរលេខកូដសម្ងាត់ */}
                     <button
                       onClick={() => setShowPinModal(true)}
                       className="bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1"
@@ -711,7 +716,15 @@
                     <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-widest drop-shadow-md">
                       🏆 {appTitle}
                     </h1>
-                    <p className={`text-xs mt-1 ${subText}`}>
+
+                    {/* បង្ហាញកាលបរិច្ឆេទថ្ងៃប្រកួត Auto */}
+                    <div className="inline-flex items-center gap-2 mt-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs text-amber-300 font-medium">
+                      <span>📅 {liveDate.fullDate}</span>
+                      <span>•</span>
+                      <span>⏰ ម៉ោង {liveDate.time}</span>
+                    </div>
+
+                    <p className={`text-xs mt-2 ${subText}`}>
                       ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ + ប្រើពេលតិចជាងគេ (លឿនជាងគេ) | 📡 Real-time Live
                     </p>
                     {leaderboard.length < 3 ? (
@@ -779,6 +792,9 @@
                             <div className="flex items-center gap-3">
                               <span className={`font-bold w-6 ${subText}`}>#{idx + 1}</span>
                               <span className="font-medium">{item.name}</span>
+                              {item.submittedTime && (
+                                <span className="text-[10px] text-slate-500 font-normal">({item.submittedTime})</span>
+                              )}
                             </div>
                             <div className="flex items-center gap-4">
                               <span className={`text-xs ${subText}`}>⏱️ {item.timeSpent} វិនាទី</span>
@@ -939,7 +955,7 @@
                 </div>
               )}
 
-              {/* MODAL ប្តូរលេខសម្ងាត់ (CHANGE PIN MODAL) */}
+              {/* MODAL ប្តូរលេខសម្ងាត់ */}
               {showPinModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className={`max-w-sm w-full rounded-3xl border p-6 shadow-2xl space-y-4 ${cardBg}`}>
@@ -1006,7 +1022,7 @@
         }
 
         // =========================================================================
-        // ផ្ទាំងសិស្សចូលលេង
+        // ផ្ទាំងសិស្សចូលលេង (បង្ហាញថ្ងៃ & ម៉ោង Auto ពេលសិស្សចូលលេង)
         // =========================================================================
         return (
           <div className={`flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 relative ${themeBg}`}>
@@ -1023,12 +1039,19 @@
             {!started ? (
               <div className={`p-6 sm:p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl relative ${cardBg}`}>
                 <div className="text-5xl sm:text-6xl mb-3 animate-bounce">⚡</div>
-                <h1 className="text-lg sm:text-2xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 leading-snug">
+                <h1 className="text-lg sm:text-2xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 leading-snug">
                   {appTitle}
                 </h1>
+
+                {/* កាលបរិច្ឆេទ Auto លើផ្ទាំងសិស្ស */}
+                <div className="text-[11px] text-amber-400 font-medium mb-2">
+                  📅 {liveDate.fullDate}
+                </div>
+
                 <p className={`text-xs mb-5 ${subText}`}>
                   ⏱️ ២០ វិនាទីក្នុង ១ សំណួរ | ឆ្លើយត្រូវ និងលឿនជាងគេដើម្បីបានពាន!
                 </p>
+
                 <input
                   type="text"
                   placeholder="វាយឈ្មោះរបស់អ្នក..."
