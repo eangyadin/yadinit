@@ -217,6 +217,8 @@
         });
 
         const [editingQuestions, setEditingQuestions] = useState(() => activeQuestions);
+        
+        // ពិន្ទុជុំបច្ចុប្បន្ន
         const [leaderboard, setLeaderboard] = useState(() => {
           try {
             const saved = localStorage.getItem('kahoot_board');
@@ -224,8 +226,19 @@
           } catch (e) { return []; }
         });
 
+        // ប្រវត្តិនៃការប្រកួតជុំមុនៗ (Match History Archive)
+        const [historyList, setHistoryList] = useState(() => {
+          try {
+            const saved = localStorage.getItem('kahoot_history_archives');
+            return saved ? JSON.parse(saved) : [];
+          } catch (e) { return []; }
+        });
+
         const [showImportModal, setShowImportModal] = useState(false);
         const [showPinModal, setShowPinModal] = useState(false);
+        const [showHistoryModal, setShowHistoryModal] = useState(false);
+        const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+
         const [bulkText, setBulkText] = useState('');
         const [oldPinInput, setOldPinInput] = useState('');
         const [newPinInput, setNewPinInput] = useState('');
@@ -357,6 +370,69 @@
           sendMqttMessage("SET_TITLE", newTitle);
         };
 
+        // មុខងាររក្សាទុកទិន្នន័យចាស់ រួចចាប់ផ្តើមលេងជុំថ្មី (Archive & Start New Round)
+        const handleStartNewRound = () => {
+          if (leaderboard.length === 0) {
+            return alert("មិនទាន់មានលទ្ធផលក្នុងជុំនេះសម្រាប់រក្សាទុកនៅឡើយទេ!");
+          }
+
+          if (confirm(`តើអ្នកពិតជាចង់រក្សាទុកលទ្ធផលអ្នកចូលរួមទាំង ${leaderboard.length} នាក់នេះ ចូលក្នុងប្រវត្តិ ហើយចាប់ផ្តើមជុំថ្មីមែនទេ?`)) {
+            const newArchiveItem = {
+              id: Date.now(),
+              title: appTitle,
+              date: liveDate.fullDate,
+              time: liveDate.time,
+              shortDate: liveDate.shortDate,
+              totalParticipants: leaderboard.length,
+              top1: leaderboard[0] ? leaderboard[0].name : "គ្មាន",
+              data: [...leaderboard]
+            };
+
+            const updatedHistory = [newArchiveItem, ...historyList];
+            setHistoryList(updatedHistory);
+            localStorage.setItem('kahoot_history_archives', JSON.stringify(updatedHistory));
+
+            // សម្អាតពិន្ទុជុំបច្ចុប្បន្នដើម្បីឱ្យសិស្សលេងជុំថ្មី
+            setLeaderboard([]);
+            localStorage.removeItem('kahoot_board');
+            sendMqttMessage("CLEAR_SCORES", {});
+
+            alert("ជោគជ័យ! ទិន្នន័យជុំចាស់ត្រូវបានកត់ត្រាទុកក្នុងប្រវត្តិកម្រងរួចរាល់។ វេទិកាពានរង្វាន់បានត្រៀមរួចជាស្រេចសម្រាប់ជុំថ្មី!");
+          }
+        };
+
+        // មុខងារទាញយក Excel ពីតារាងណាមួយ (Current ឬ History)
+        const exportTableToExcel = (dataList, customTitle, dateString) => {
+          if (!dataList || dataList.length === 0) return alert("គ្មានទិន្នន័យសម្រាប់ទាញយកទេ!");
+
+          let csvContent = "\uFEFF";
+          csvContent += `របាយការណ៍លទ្ធផល៖ ${customTitle}\n`;
+          csvContent += `កាលបរិច្ឆេទ៖ ${dateString || liveDate.fullDate}\n`;
+          csvContent += `រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង\n\n`;
+          csvContent += "ចំណាត់ថ្នាក់,ឈ្មោះសិស្ស,ពិន្ទុ (Score),រយៈពេលឆ្លើយ (វិនាទី),ម៉ោងឆ្លើយចប់,កាលបរិច្ឆេទ\n";
+
+          dataList.forEach((item, index) => {
+            const rank = index + 1;
+            const name = `"${item.name.replace(/"/g, '""')}"`;
+            const scoreVal = item.score;
+            const timeSpent = item.timeSpent;
+            const timeSub = `"${item.submittedTime || liveDate.time}"`;
+            const dateSub = `"${item.submittedDate || liveDate.shortDate}"`;
+
+            csvContent += `${rank},${name},${scoreVal},${timeSpent},${timeSub},${dateSub}\n`;
+          });
+
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.setAttribute("href", url);
+          link.setAttribute("download", `លទ្ធផល_${customTitle}_${liveDate.shortDate}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        };
+
         const handleAddNewQuestion = () => {
           const newQ = {
             id: Date.now(),
@@ -394,42 +470,6 @@
           setEditingQuestions(updated);
         };
 
-        // មុខងារទាញយកទិន្នន័យជា Excel (.csv / .xlsx) គាំទ្រអក្សរខ្មែរ ១០០%
-        const handleExportToExcel = () => {
-          if (leaderboard.length === 0) return alert("មិនទាន់មានទិន្នន័យសិស្សចូលលេងសម្រាប់ទាញយកទេ!");
-
-          let csvContent = "\uFEFF"; // UTF-8 BOM ដើម្បីកុំឱ្យបែកពុម្ពអក្សរខ្មែរក្នុង Excel
-          csvContent += `របាយការណ៍លទ្ធផល៖ ${appTitle}\n`;
-          csvContent += `កាលបរិច្ឆេទ៖ ${liveDate.fullDate}\n`;
-          csvContent += `រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង\n\n`;
-          
-          // ក្បាលតារាង Excel
-          csvContent += "ចំណាត់ថ្នាក់,ឈ្មោះសិស្ស,ពិន្ទុ (Score),រយៈពេលឆ្លើយ (វិនាទី),ម៉ោងឆ្លើយចប់,កាលបរិច្ឆេទ\n";
-
-          // បញ្ចូលជួរដេកតាមសិស្សនីមួយៗ
-          leaderboard.forEach((item, index) => {
-            const rank = index + 1;
-            const name = `"${item.name.replace(/"/g, '""')}"`;
-            const scoreVal = item.score;
-            const timeSpent = item.timeSpent;
-            const timeSub = `"${item.submittedTime || liveDate.time}"`;
-            const dateSub = `"${item.submittedDate || liveDate.shortDate}"`;
-
-            csvContent += `${rank},${name},${scoreVal},${timeSpent},${timeSub},${dateSub}\n`;
-          });
-
-          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.setAttribute("href", url);
-          link.setAttribute("download", `លទ្ធផល_${appTitle}_${liveDate.shortDate}.csv`);
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        };
-
-        // ទាញយក Word មានកាលបរិច្ឆេទ Auto
         const handleExportToWord = () => {
           if (editingQuestions.length === 0) return alert("គ្មានសំណួរសម្រាប់ទាញយកទេ!");
 
@@ -526,14 +566,6 @@
           setAdminTab("podium");
         };
 
-        const handleClearScores = () => {
-          if (confirm("តើចង់សម្អាតពិន្ទុដើម្បីចាប់ផ្តើមជុំថ្មីមែនទេ? (លោកគ្រូអាចទាញយក Excel ទុកជាមុនសិន)")) {
-            setLeaderboard([]);
-            localStorage.removeItem("kahoot_board");
-            sendMqttMessage("CLEAR_SCORES", {});
-          }
-        };
-
         const startStudentGame = () => {
           if (!userName.trim()) return;
           const currentActive = activeQuestions.length > 0 ? activeQuestions : DEFAULT_QUESTIONS;
@@ -604,7 +636,7 @@
               score: finalScore,
               timeSpent: finalTotalTime,
               submittedTime: curDateInfo.time,
-              submittedDate: curDateInfo.shortDate // កត់ត្រាកាលបរិច្ឆេទថ្ងៃប្រកួត Auto សម្រាប់ Excel
+              submittedDate: curDateInfo.shortDate
             };
 
             sendMqttMessage("NEW_SCORE", playerData);
@@ -701,6 +733,14 @@
                     >
                       ⚙️ ផ្ទាំងកែសំណួរ ({editingQuestions.length})
                     </button>
+                    
+                    {/* ប៊ូតុងបើកផ្ទាំងប្រវត្តិនៃការប្រកួត */}
+                    <button
+                      onClick={() => setShowHistoryModal(true)}
+                      className="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                    >
+                      📜 ប្រវត្តិប្រកួត ({historyList.length})
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -731,12 +771,16 @@
                     >
                       👁️‍🗨️ លាក់របារ
                     </button>
+                    
+                    {/* ប៊ូតុងចាប់ផ្តើមជុំថ្មី (រក្សាទុកចាស់) */}
                     <button
-                      onClick={handleClearScores}
-                      className="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-2 rounded-xl text-xs hover:bg-rose-500/30 transition"
+                      onClick={handleStartNewRound}
+                      className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-md transition flex items-center gap-1"
+                      title="រក្សាទុកទិន្នន័យជុំនេះទុកក្នុងប្រវត្តិ ហើយចាប់ផ្តើមជុំថ្មី"
                     >
-                      សម្អាតពិន្ទុ
+                      🔄 ចាប់ផ្តើមជុំថ្មី
                     </button>
+
                     <button
                       onClick={handleLogoutAdmin}
                       className="bg-slate-800 text-slate-300 px-3 py-2 rounded-xl text-xs hover:bg-slate-700 transition"
@@ -810,27 +854,27 @@
                     </div>
                   </div>
 
-                  {/* តារាងលទ្ធផលសិស្សទាំងអស់ + ប៊ូតុង Export Excel */}
+                  {/* តារាងលទ្ធផលសិស្សទាំងអស់ */}
                   <div className={`border rounded-2xl p-5 shadow-xl ${cardBg}`}>
                     <div className="flex flex-wrap justify-between items-center gap-3 mb-3 border-b pb-3 border-slate-800">
                       <h3 className={`text-xs font-bold uppercase tracking-wider ${subText}`}>
-                        អ្នកចូលរួមទាំងអស់ ({leaderboard.length} នាក់)
+                        អ្នកចូលរួមជុំបច្ចុប្បន្ន ({leaderboard.length} នាក់)
                       </h3>
 
-                      {/* ប៊ូតុងទាញយកជា Excel */}
-                      <button
-                        onClick={handleExportToExcel}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs shadow-md transition flex items-center gap-1.5 active:scale-95"
-                        title="ទាញយកទិន្នន័យសិស្សទាំងអស់ជាឯកសារ Excel"
-                      >
-                        <span>📊</span>
-                        <span>ទាញយកជា Excel</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => exportTableToExcel(leaderboard, appTitle, liveDate.fullDate)}
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs shadow-md transition flex items-center gap-1.5 active:scale-95"
+                        >
+                          <span>📊</span>
+                          <span>ទាញយកជា Excel</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {leaderboard.length === 0 ? (
-                        <p className={`text-center py-6 text-sm ${subText}`}>មិនទាន់មានសិស្សឆ្លើយចប់នៅឡើយទេ...</p>
+                        <p className={`text-center py-6 text-sm ${subText}`}>មិនទាន់មានសិស្សឆ្លើយចប់ក្នុងជុំនេះនៅឡើយទេ...</p>
                       ) : (
                         leaderboard.map((item, idx) => (
                           <div
@@ -876,7 +920,6 @@
                       <button
                         onClick={handleExportToWord}
                         className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5"
-                        title="ទាញយកសំណួរទាំងអស់ជាឯកសារ Word (.doc)"
                       >
                         📄 ទាញយកជា Word
                       </button>
@@ -957,6 +1000,62 @@
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* MODAL ប្រវត្តិនៃការប្រកួត (MATCH HISTORY MODAL) */}
+              {showHistoryModal && (
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className={`max-w-3xl w-full rounded-3xl border p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col ${cardBg}`}>
+                    <div className="flex justify-between items-center border-b pb-3 border-slate-800">
+                      <div>
+                        <h3 className="text-lg font-bold text-cyan-400 flex items-center gap-2">
+                          <span>📜</span>
+                          <span>ប្រវត្តិនៃការប្រកួតកន្លងមក (Match History)</span>
+                        </h3>
+                        <p className={`text-xs ${subText}`}>ទិន្នន័យគ្រប់ជុំទាំងអស់ត្រូវបានរក្សាទុកដោយសុវត្ថិភាព</p>
+                      </div>
+                      <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                      {historyList.length === 0 ? (
+                        <p className={`text-center py-10 text-sm ${subText}`}>មិនទាន់មានប្រវត្តិប្រកួតដែលបាន Archive ទុកនៅឡើយទេ...</p>
+                      ) : (
+                        historyList.map((item, hIdx) => (
+                          <div key={item.id} className={`p-4 rounded-2xl border ${isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200"} flex flex-wrap justify-between items-center gap-3`}>
+                            <div>
+                              <div className="font-bold text-sm text-amber-400">{item.title}</div>
+                              <div className={`text-xs ${subText} mt-0.5`}>
+                                📅 {item.date} • ម៉ោង {item.time} | 👥 សិស្សចូលរួម៖ <span className="font-bold text-white">{item.totalParticipants} នាក់</span>
+                              </div>
+                              <div className="text-xs text-emerald-400 font-medium mt-1">
+                                🥇 ជើងឯកលេខ ១៖ {item.top1}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => exportTableToExcel(item.data, `${item.title}_ជុំទី${historyList.length - hIdx}`, item.date)}
+                                className="bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                              >
+                                📊 ទាញយក Excel
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center pt-3 border-t border-slate-800 text-xs">
+                      <span className={subText}>សរុប {historyList.length} ជុំប្រកួត</span>
+                      <button
+                        onClick={() => setShowHistoryModal(false)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      >
+                        បិទផ្ទាំង
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
