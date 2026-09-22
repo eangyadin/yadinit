@@ -50,6 +50,7 @@
       const MQTT_TOPIC = "ict_preyveng_quiz_sync_live_v3";
       const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 
+      // មុខងារបំប្លែងកាលបរិច្ឆេទជាភាសាខ្មែរ Auto
       const getKhmerDateTime = () => {
         const now = new Date();
         const days = ['អាទិត្យ', 'ច័ន្ទ', 'អង្គារ', 'ពុធ', 'ព្រហស្បតិ៍', 'សុក្រ', 'សៅរ៍'];
@@ -484,7 +485,7 @@
             <body>
               <h2>កម្រងសំណួរ៖ ${appTitle}</h2>
               <div class="meta">
-                📅 កាលបរិច្ឆេទ៖ ${liveDate.fullDate} (ម៉ោង ${liveDate.time})<br/>
+                📅 កាលបរិច្ឆេទ៖ ${liveDate.fullDate}<br/>
                 ✍️ រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង | សរុប ${editingQuestions.length} សំណួរ
               </div>
               <hr/>
@@ -789,23 +790,10 @@
                       🏆 {appTitle}
                     </h1>
 
-                    <div className="inline-flex items-center gap-2 mt-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs text-amber-300 font-medium">
+                    {/* បង្ហាញតែថ្ងៃខែឆ្នាំ Auto សុទ្ធសាធ (ដកម៉ោង និងដកប្រអប់រង់ចាំចេញរួចរាល់) */}
+                    <div className="inline-flex items-center gap-2 mt-2 px-4 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs text-amber-300 font-semibold shadow-sm">
                       <span>📅 {liveDate.fullDate}</span>
-                      <span>•</span>
-                      <span>⏰ ម៉ោង {liveDate.time}</span>
                     </div>
-
-                    {/* បានដកអក្សរចោលតាមការស្នើសុំ */}
-
-                    {leaderboard.length < 3 ? (
-                      <div className="inline-block mt-3 px-3 py-1 bg-purple-950/40 border border-purple-800/50 rounded-full text-[11px] text-purple-300 font-medium">
-                        ⏳ កំពុងរង់ចាំអ្នកលេងគ្រប់ ៣ នាក់ ដើម្បីប្រកាសកាំជ្រួច និងសំឡេងជ័យជម្នះស្វ័យប្រវត្តិ ({leaderboard.length}/3)
-                      </div>
-                    ) : (
-                      <div className="inline-block mt-3 px-3 py-1 bg-emerald-950/40 border border-emerald-800/50 rounded-full text-[11px] text-emerald-400 font-bold">
-                        🎉 បានរកឃើញកំពូលអ្នកឈ្នះទាំង ៣ រូបពេញលេញហើយ!
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex justify-center items-end gap-3 md:gap-6 max-w-2xl mx-auto h-64 mb-10">
@@ -994,7 +982,7 @@
                 </div>
               )}
 
-              {/* MODAL ប្រវត្តិនៃការប្រកួត (MATCH HISTORY MODAL) */}
+              {/* MODAL ប្រវត្តិនៃការប្រកួត */}
               {showHistoryModal && (
                 <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className={`max-w-3xl w-full rounded-3xl border p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col ${cardBg}`}>
