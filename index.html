@@ -38,8 +38,6 @@
         animation: pulse-timer 0.6s infinite;
         color: #ef4444 !important;
       }
-
-      /* Animations សម្រាប់ Podium និង Reveal */
       @keyframes popIn {
         0% { transform: scale(0.3) translateY(60px); opacity: 0; }
         70% { transform: scale(1.08) translateY(-8px); opacity: 1; }
@@ -129,7 +127,6 @@
             osc.start();
             osc.stop(ctx.currentTime + 0.3);
           } else if (type === 'drumroll') {
-            // សំឡេងស្គររោទ៍រង់ចាំប្រកាស
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.type = 'sawtooth';
@@ -259,13 +256,21 @@
           } catch (e) { return []; }
         });
 
-        // ដំណាក់កាលប្រកាសអ្នកឈ្នះ (0=លាក់, 1=បង្ហាញលេខ៣, 2=បង្ហាញលេខ២, 3=បង្ហាញលេខ១ ពេញលេញ)
+        // បណ្ណាល័យកម្រងសំណួរតាមកាលបរិច្ឆេទ (Question Bank Archive)
+        const [savedQuizBank, setSavedQuizBank] = useState(() => {
+          try {
+            const saved = localStorage.getItem('kahoot_saved_quizzes');
+            return saved ? JSON.parse(saved) : [];
+          } catch (e) { return []; }
+        });
+
         const [podiumRevealStep, setPodiumRevealStep] = useState(0);
         const [isRevealing, setIsRevealing] = useState(false);
 
         const [showImportModal, setShowImportModal] = useState(false);
         const [showPinModal, setShowPinModal] = useState(false);
         const [showHistoryModal, setShowHistoryModal] = useState(false);
+        const [showQuizBankModal, setShowQuizBankModal] = useState(false);
 
         const [bulkText, setBulkText] = useState('');
         const [oldPinInput, setOldPinInput] = useState('');
@@ -378,7 +383,6 @@
           window.location.hash = "";
         };
 
-        // មុខងារប្រកាសជ័យលាភី Top 3 តាមលំដាប់លំដោយរំភើបអស្ចារ្យ
         const handleTriggerReveal = () => {
           if (leaderboard.length < 3) {
             return alert(`ត្រូវការសិស្សយ៉ាងហោចណាស់ ៣ នាក់ដើម្បីប្រកាសជ័យលាភី! (បច្ចុប្បន្នទើបមាន ${leaderboard.length} នាក់)`);
@@ -387,20 +391,17 @@
           setIsRevealing(true);
           setPodiumRevealStep(0);
 
-          // ជំហានទី ១៖ បង្ហាញលេខ ៣ (ក្រោយ ២ វិនាទី)
           playSound('drumroll');
           setTimeout(() => {
             setPodiumRevealStep(1);
             playSound('correct');
           }, 1800);
 
-          // ជំហានទី ២៖ បង្ហាញលេខ ២ (ក្រោយ ៤ វិនាទី)
           setTimeout(() => {
             setPodiumRevealStep(2);
             playSound('correct');
           }, 3800);
 
-          // ជំហានទី ៣៖ បង្ហាញលេខ ១ ជើងឯក + កាំជ្រួចធំ + ភ្លេងជ័យជម្នះ (ក្រោយ ៦ វិនាទី)
           setTimeout(() => {
             setPodiumRevealStep(3);
             setIsRevealing(false);
@@ -455,6 +456,50 @@
             sendMqttMessage("CLEAR_SCORES", {});
 
             alert("ជោគជ័យ! ទិន្នន័យជុំចាស់ត្រូវបានកត់ត្រាទុកក្នុងប្រវត្តិកម្រងរួចរាល់។");
+          }
+        };
+
+        // មុខងារសម្អាតដើម្បីបង្កើតសំណួរថ្មីសន្លាង (ដោយស្វ័យប្រវត្តិកត់ទុកសំណួរចាស់ចូល Bank)
+        const handleClearForNewQuestions = () => {
+          if (editingQuestions.length > 0) {
+            // កត់ត្រាសំណួរចាស់ចូល Bank ជាមុន
+            const archiveQuiz = {
+              id: Date.now(),
+              title: appTitle,
+              date: liveDate.fullDate,
+              shortDate: liveDate.shortDate,
+              time: liveDate.time,
+              questionsCount: editingQuestions.length,
+              questions: [...editingQuestions]
+            };
+            const updatedBank = [archiveQuiz, ...savedQuizBank];
+            setSavedQuizBank(updatedBank);
+            localStorage.setItem('kahoot_saved_quizzes', JSON.stringify(updatedBank));
+          }
+
+          setEditingQuestions([
+            {
+              id: Date.now(),
+              question: 'សំណួរទី ១៖ ...',
+              options: ['ជម្រើសទី ១', 'ជម្រើសទី ២', 'ជម្រើសទី ៣', 'ជម្រើសទី ៤'],
+              answer: 'ជម្រើសទី ១'
+            }
+          ]);
+          alert("បានរក្សាទុកសំណួរចាស់ចូលទៅក្នុង «បណ្ណាល័យសំណួរ» រួចរាល់! ផ្ទាំងសំណួរត្រូវបានសម្អាតសម្រាប់លោកគ្រូវាយ ឬបិទភ្ជាប់ (Paste) សំណួរថ្មី។");
+        };
+
+        // មុខងារទាញយកសំណួរចាស់ពី Bank មកប្រើឡើងវិញ
+        const handleRestoreQuizFromBank = (quizItem) => {
+          if (confirm(`តើអ្នកចង់ទាញយកកម្រងសំណួរ «${quizItem.title}» (កាលបរិច្ឆេទ៖ ${quizItem.date}) មកប្រើឡើងវិញមែនទេ?`)) {
+            setEditingQuestions(quizItem.questions);
+            setActiveQuestions(quizItem.questions);
+            setAppTitle(quizItem.title);
+            localStorage.setItem("active_quiz_questions", JSON.stringify(quizItem.questions));
+            localStorage.setItem("quiz_app_title", quizItem.title);
+            sendMqttMessage("SET_QUESTIONS", quizItem.questions);
+            sendMqttMessage("SET_TITLE", quizItem.title);
+            setShowQuizBankModal(false);
+            alert("បានទាញយក និងដាក់ឱ្យសិស្សលេងកម្រងសំណួរនេះជោគជ័យ!");
           }
         };
 
@@ -526,14 +571,14 @@
           setEditingQuestions(updated);
         };
 
-        const handleExportToWord = () => {
-          if (editingQuestions.length === 0) return alert("គ្មានសំណួរសម្រាប់ទាញយកទេ!");
+        const exportQuestionsToWord = (qList, docTitle, docDate) => {
+          if (!qList || qList.length === 0) return alert("គ្មានសំណួរសម្រាប់ទាញយកទេ!");
 
           let htmlContent = `
             <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
             <head>
               <meta charset='utf-8'>
-              <title>${appTitle}</title>
+              <title>${docTitle}</title>
               <style>
                 body { font-family: 'Kantumruy Pro', 'Khmer OS Siemreap', Arial, sans-serif; line-height: 1.6; }
                 h2 { text-align: center; color: #1e3a8a; margin-bottom: 2px; }
@@ -545,15 +590,15 @@
               </style>
             </head>
             <body>
-              <h2>កម្រងសំណួរ៖ ${appTitle}</h2>
+              <h2>កម្រងសំណួរ៖ ${docTitle}</h2>
               <div class="meta">
-                📅 កាលបរិច្ឆេទ៖ ${liveDate.fullDate}<br/>
-                ✍️ រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង | សរុប ${editingQuestions.length} សំណួរ
+                📅 កាលបរិច្ឆេទ៖ ${docDate || liveDate.fullDate}<br/>
+                ✍️ រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង | សរុប ${qList.length} សំណួរ
               </div>
               <hr/>
           `;
 
-          editingQuestions.forEach((q, idx) => {
+          qList.forEach((q, idx) => {
             htmlContent += `
               <div class="q-item">
                 <div class="q-title">សំណួរទី ${idx + 1}៖ ${q.question}</div>
@@ -574,7 +619,7 @@
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `${appTitle}_${liveDate.shortDate}.doc`;
+          link.download = `${docTitle}_${liveDate.shortDate}.doc`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -617,8 +662,24 @@
         const handleSaveAndActivate = () => {
           setActiveQuestions(editingQuestions);
           localStorage.setItem("active_quiz_questions", JSON.stringify(editingQuestions));
+          
+          // រក្សាទុកកម្រងសំណួរនេះចូលទៅក្នុងបណ្ណាល័យស្វ័យប្រវត្តិ
+          const currentArchive = {
+            id: Date.now(),
+            title: appTitle,
+            date: liveDate.fullDate,
+            shortDate: liveDate.shortDate,
+            time: liveDate.time,
+            questionsCount: editingQuestions.length,
+            questions: [...editingQuestions]
+          };
+          const filteredBank = savedQuizBank.filter(q => q.title !== appTitle || q.shortDate !== liveDate.shortDate);
+          const updatedBank = [currentArchive, ...filteredBank];
+          setSavedQuizBank(updatedBank);
+          localStorage.setItem('kahoot_saved_quizzes', JSON.stringify(updatedBank));
+
           sendMqttMessage("SET_QUESTIONS", editingQuestions);
-          alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបានផ្សាយឡើង Cloud រួចរាល់។`);
+          alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបានផ្សាយឡើង Cloud រួចរាល់ និងបានកត់ចូលបណ្ណាល័យសំណួរ!`);
           setAdminTab("podium");
         };
 
@@ -856,7 +917,6 @@
                       <span>📅 {liveDate.fullDate}</span>
                     </div>
 
-                    {/* ប៊ូតុងរំភើបអស្ចារ្យ សម្រាប់គ្រូចុចប្រកាសអ្នកឈ្នះ Top 3 ពេលសិស្សធ្វើចប់គ្រប់គ្នា */}
                     <div className="mt-4">
                       {podiumRevealStep < 3 ? (
                         <button
@@ -881,9 +941,8 @@
                     </div>
                   </div>
 
-                  {/* វេទិកា PODIUM បែប ANIMATION រស់រវើក និងទាន់សម័យ */}
                   <div className="flex justify-center items-end gap-3 md:gap-6 max-w-2xl mx-auto h-64 mb-10">
-                    {/* លេខ ២ (បង្ហាញនៅជំហានទី ២) */}
+                    {/* លេខ ២ */}
                     <div className="flex-1 flex flex-col items-center">
                       {podiumRevealStep >= 2 ? (
                         <div className="flex flex-col items-center animate-pop-in">
@@ -900,7 +959,7 @@
                       </div>
                     </div>
 
-                    {/* លេខ ១ ជើងឯក (បង្ហាញចុងក្រោយបង្អស់ ជាមួយ Glow មាស និងម្កុដរលោង) */}
+                    {/* លេខ ១ */}
                     <div className="flex-1 flex flex-col items-center">
                       {podiumRevealStep >= 3 ? (
                         <div className="flex flex-col items-center animate-pop-in">
@@ -921,7 +980,7 @@
                       </div>
                     </div>
 
-                    {/* លេខ ៣ (បង្ហាញមុនគេបង្អស់នៅជំហានទី ១) */}
+                    {/* លេខ ៣ */}
                     <div className="flex-1 flex flex-col items-center">
                       {podiumRevealStep >= 1 ? (
                         <div className="flex flex-col items-center animate-pop-in">
@@ -939,7 +998,6 @@
                     </div>
                   </div>
 
-                  {/* តារាងលទ្ធផលសិស្សទាំងអស់ */}
                   <div className={`border rounded-2xl p-5 shadow-xl ${cardBg}`}>
                     <div className="flex flex-wrap justify-between items-center gap-3 mb-3 border-b pb-3 border-slate-800">
                       <h3 className={`text-xs font-bold uppercase tracking-wider ${subText}`}>
@@ -1003,26 +1061,38 @@
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-2">
                       <button
-                        onClick={handleExportToWord}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5"
+                        onClick={() => exportQuestionsToWord(editingQuestions, appTitle, liveDate.fullDate)}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5"
                       >
                         📄 ទាញយកជា Word
                       </button>
                       <button
-                        onClick={() => setShowImportModal(true)}
-                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-lg flex items-center gap-1.5"
+                        onClick={() => setShowQuizBankModal(true)}
+                        className="bg-amber-600 hover:bg-amber-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5"
                       >
-                        ⚡ បញ្ចូលសំណួររហ័ស (Bulk)
+                        🗄️ បណ្ណាល័យសំណួរ ({savedQuizBank.length})
+                      </button>
+                      <button
+                        onClick={handleClearForNewQuestions}
+                        className="bg-purple-700 hover:bg-purple-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5"
+                      >
+                        🧹 បង្កើតកម្រងថ្មី
+                      </button>
+                      <button
+                        onClick={() => setShowImportModal(true)}
+                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-lg flex items-center gap-1.5"
+                      >
+                        ⚡ បញ្ចូលរហ័ស (Bulk)
                       </button>
                       <button
                         onClick={handleAddNewQuestion}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-xl text-xs font-bold transition"
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition"
                       >
                         ➕ ថែមសំណួរ
                       </button>
                       <button
                         onClick={handleSaveAndActivate}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-lg flex items-center gap-1.5"
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg flex items-center gap-1.5"
                       >
                         💾 រក្សាទុក និងផ្សាយ ({editingQuestions.length})
                       </button>
@@ -1085,6 +1155,65 @@
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* MODAL បណ្ណាល័យសំណួរចាស់ៗតាមកាលបរិច្ឆេទ (QUIZ BANK MODAL) */}
+              {showQuizBankModal && (
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className={`max-w-3xl w-full rounded-3xl border p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col ${cardBg}`}>
+                    <div className="flex justify-between items-center border-b pb-3 border-slate-800">
+                      <div>
+                        <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2">
+                          <span>🗄️</span>
+                          <span>បណ្ណាល័យកម្រងសំណួរចាស់ៗ (Saved Quiz Bank)</span>
+                        </h3>
+                        <p className={`text-xs ${subText}`}>សំណួរដែលធ្លាប់បានបង្កើតត្រូវបានកត់ត្រាទុកតាមថ្ងៃខែឆ្នាំ</p>
+                      </div>
+                      <button onClick={() => setShowQuizBankModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                      {savedQuizBank.length === 0 ? (
+                        <p className={`text-center py-10 text-sm ${subText}`}>មិនទាន់មានកម្រងសំណួរដែលបានរក្សាទុកក្នុងបណ្ណាល័យនៅឡើយទេ...</p>
+                      ) : (
+                        savedQuizBank.map((item) => (
+                          <div key={item.id} className={`p-4 rounded-2xl border ${isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200"} flex flex-wrap justify-between items-center gap-3`}>
+                            <div>
+                              <div className="font-bold text-sm text-purple-300">{item.title}</div>
+                              <div className={`text-xs ${subText} mt-0.5`}>
+                                📅 {item.date} • ម៉ោង {item.time} | 📝 ចំនួន៖ <span className="font-bold text-amber-400">{item.questionsCount} សំណួរ</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => exportQuestionsToWord(item.questions, item.title, item.date)}
+                                className="bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                              >
+                                📄 Word
+                              </button>
+                              <button
+                                onClick={() => handleRestoreQuizFromBank(item)}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow flex items-center gap-1"
+                              >
+                                📥 យកមកប្រើឡើងវិញ
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center pt-3 border-t border-slate-800 text-xs">
+                      <span className={subText}>សរុប {savedQuizBank.length} កម្រងសំណួរ</span>
+                      <button
+                        onClick={() => setShowQuizBankModal(false)}
+                        className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      >
+                        បិទផ្ទាំង
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
