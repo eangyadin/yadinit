@@ -2,8 +2,13 @@
 <html lang="km">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>តេស្តកញ្ចប់អំណាន - អ៊ាង យ៉ាឌីន ICTព្រៃវែង</title>
+    <!-- បិទ Cache របស់ Browser ដាច់ខាត ដើម្បីឱ្យទូរស័ព្ទ Refresh ចេញសំណួរថ្មីភ្លាមៗ -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,7 +20,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- MQTT Broker សម្រាប់ Sync ទិន្នន័យពីទូរស័ព្ទសិស្សទៅកុំព្យូទ័រគ្រូឆ្លងអ៊ីនធឺណិត Realtime -->
+    <!-- MQTT Broker សម្រាប់ Sync ទិន្នន័យ Realtime -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <!-- Confetti / Fireworks -->
@@ -24,6 +29,7 @@
       body {
         font-family: 'Kantumruy Pro', sans-serif;
         transition: background-color 0.3s ease, color 0.3s ease;
+        -webkit-tap-highlight-color: transparent;
       }
       @keyframes pulse-timer {
         0%, 100% { transform: scale(1); }
@@ -41,10 +47,10 @@
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
 
-      const MQTT_TOPIC = "ict_cambodia_preyveng_quiz_sync_v2";
+      // MQTT Cloud Channel សម្រាប់សាលារបស់លោកគ្រូ
+      const MQTT_TOPIC = "ict_preyveng_quiz_sync_live_v3";
       const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 
-      // ប្រព័ន្ធសំឡេងបែបស្តង់ដា និងបទភ្លេងជ័យជម្នះអបអរសាទរ
       const playSound = (type) => {
         try {
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -81,20 +87,18 @@
             osc.start();
             osc.stop(ctx.currentTime + 0.3);
           } else if (type === 'victory') {
-            // បទភ្លេងជ័យជម្នះបែបស្តង់ដា (Grand Olympic / Tournament Fanfare)
             const notes = [
-              { f: 523.25, d: 0.15, t: 0 },       // C5
-              { f: 523.25, d: 0.15, t: 0.15 },    // C5
-              { f: 523.25, d: 0.15, t: 0.3 },     // C5
-              { f: 659.25, d: 0.45, t: 0.45 },    // E5
-              { f: 523.25, d: 0.15, t: 0.95 },    // C5
-              { f: 659.25, d: 0.15, t: 1.1 },     // E5
-              { f: 783.99, d: 0.7, t: 1.25 },     // G5 (High)
-              { f: 659.25, d: 0.2, t: 2.0 },      // E5
-              { f: 783.99, d: 0.2, t: 2.2 },      // G5
-              { f: 1046.50, d: 1.2, t: 2.4 }      // C6 (Grand Finale)
+              { f: 523.25, d: 0.15, t: 0 },
+              { f: 523.25, d: 0.15, t: 0.15 },
+              { f: 523.25, d: 0.15, t: 0.3 },
+              { f: 659.25, d: 0.45, t: 0.45 },
+              { f: 523.25, d: 0.15, t: 0.95 },
+              { f: 659.25, d: 0.15, t: 1.1 },
+              { f: 783.99, d: 0.7, t: 1.25 },
+              { f: 659.25, d: 0.2, t: 2.0 },
+              { f: 783.99, d: 0.2, t: 2.2 },
+              { f: 1046.50, d: 1.2, t: 2.4 }
             ];
-
             notes.forEach((item) => {
               const osc = ctx.createOscillator();
               const gain = ctx.createGain();
@@ -111,7 +115,6 @@
         } catch (e) {}
       };
 
-      // កាំជ្រួចអបអរសាទរច្រើនដំណាក់កាលបែបស្តង់ដា
       const triggerFireworks = () => {
         playSound('victory');
         const duration = 4.5 * 1000;
@@ -137,12 +140,20 @@
         return copy;
       };
 
+      // សំណួរគំរូដើមដែលលោកគ្រូកំពុងប្រើ
       const DEFAULT_QUESTIONS = [
-        { id: 1, question: 'តើព្យញ្ជនៈខ្មែរមានទាំងអស់ចំនួនប៉ុន្មានតួ?', options: ['៣១ តួ', '៣២ តួ', '៣៣ តួ', '៣៤ តួ'], answer: '៣៣ តួ' },
-        { id: 2, question: 'តើពាក្យណាជាពាក្យត្រឹមត្រូវ?', options: ['សាលារៀន', 'សាលារៀនន', 'សាលារៀនម', 'សាលារៀនង'], answer: 'សាលារៀន' },
-        { id: 3, question: 'តើស្រៈនិស្ស័យក្នុងភាសាខ្មែរមានប៉ុន្មានតួ?', options: ['២១ តួ', '២២ តួ', '២៣ តួ', '២៤ តួ'], answer: '២៣ តួ' },
-        { id: 4, question: 'តើពាក្យ «សៀវភៅ» ត្រូវនឹងអត្ថន័យអ្វី?', options: ['របស់សម្រាប់សរសេរ', 'របស់សម្រាប់អាន', 'របស់សម្រាប់កាត់', 'របស់សម្រាប់លុប'], answer: 'របស់សម្រាប់អាន' },
-        { id: 5, question: 'តើព្យញ្ជនៈណាជាព្យញ្ជនៈពួក (អ)?', options: ['ក', 'គ', 'ឃ', 'ង'], answer: 'ក' },
+        {
+          id: 1,
+          question: 'តើសំណួរប្រភេទណាដែលគ្រូបង្រៀនសួរទៅកាន់សិស្ស មុនពេលចាប់ផ្តើមអានអត្ថបទ ដើម្បីរំញោចការគិត និងទាក់ទាញចំណាប់អារម្មណ៍?',
+          options: ['សំណួរបំពេញចន្លោះ', 'សំណួរទស្សន៍ទាយ', 'សំណួរសង្ខេប', 'សំណួរវិភាគវេយ្យាករណ៍'],
+          answer: 'សំណួរទស្សន៍ទាយ'
+        },
+        {
+          id: 2,
+          question: 'ការឱ្យសិស្សឆ្លើយសំណួរអំពីមូលហេតុ អត្ថន័យបង្កប់ ឬព័ត៌មានលម្អិតដែលមាននៅក្នុងអត្ថបទ ត្រូវបានចាត់ចូលក្នុងយុទ្ធវិធីអ្វី?',
+          options: ['សំណួរយល់ន័យ', 'ការប្រើក្រាហ្វិក', 'ការសង្ខេបអត្ថបទ', 'ការស្វែងរកតួ'],
+          answer: 'សំណួរយល់ន័យ'
+        }
       ];
 
       function App() {
@@ -160,6 +171,7 @@
         const [isDark, setIsDark] = useState(() => localStorage.getItem('quiz_theme') !== 'light');
         const [appTitle, setAppTitle] = useState(() => localStorage.getItem('quiz_app_title') || 'តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
 
+        // សំណួរដែលសកម្ម
         const [activeQuestions, setActiveQuestions] = useState(() => {
           try {
             const saved = localStorage.getItem('active_quiz_questions');
@@ -179,9 +191,9 @@
           } catch (e) { return []; }
         });
 
-        // Modal បញ្ចូលសំណួរលឿន (Bulk Import)
         const [showImportModal, setShowImportModal] = useState(false);
         const [bulkText, setBulkText] = useState('');
+        const [cloudStatus, setCloudStatus] = useState('កំពុងភ្ជាប់...');
 
         const mqttClientRef = useRef(null);
 
@@ -202,19 +214,23 @@
           });
         };
 
+        // តភ្ជាប់ Real-time Cloud និងដោះស្រាយបញ្ហា Cache ទូរស័ព្ទ
         useEffect(() => {
-          const clientId = "quiz_user_" + Math.random().toString(16).substring(2, 8);
+          const clientId = "quiz_dev_" + Math.random().toString(16).substring(2, 9);
           const client = mqtt.connect(MQTT_BROKER, {
             clientId: clientId,
             clean: true,
-            connectTimeout: 4000,
+            connectTimeout: 5000,
             reconnectPeriod: 2000,
           });
 
           mqttClientRef.current = client;
 
           client.on("connect", () => {
+            setCloudStatus("Cloud Sync ជាប់");
             client.subscribe(MQTT_TOPIC);
+            // ប្រសិនបើជាសិស្សលើទូរស័ព្ទដៃ សូមសួររកសំណួរថ្មីចុងក្រោយពី Cloud ភ្លាម
+            client.publish(MQTT_TOPIC, JSON.stringify({ type: "REQ_LATEST_QUIZ" }));
           });
 
           client.on("message", (topic, message) => {
@@ -225,7 +241,6 @@
                   const filtered = prev.filter((p) => p.id !== packet.payload.id);
                   const updated = sortLeaderboard([...filtered, packet.payload]);
                   localStorage.setItem("kahoot_board", JSON.stringify(updated));
-                  // បើគ្រប់ ៣ នាក់ បាញ់កាំជ្រួច និងបន្លឺភ្លេងជ័យជម្នះភ្លាម
                   if (updated.length === 3) triggerFireworks();
                   return updated;
                 });
@@ -233,12 +248,19 @@
                 setLeaderboard([]);
                 localStorage.removeItem("kahoot_board");
               } else if (packet.type === "SET_QUESTIONS") {
+                // សំណួរថ្មីរត់ចូលទូរស័ព្ទសិស្សភ្លាមៗ ដោយមិនបាច់ Refresh
                 setActiveQuestions(packet.payload);
                 setEditingQuestions(packet.payload);
                 localStorage.setItem("active_quiz_questions", JSON.stringify(packet.payload));
               } else if (packet.type === "SET_TITLE") {
                 setAppTitle(packet.payload);
                 localStorage.setItem("quiz_app_title", packet.payload);
+              } else if (packet.type === "REQ_LATEST_QUIZ") {
+                // ប្រសិនបើកុំព្យូទ័រគ្រូទទួលបានការទាមទារពីទូរស័ព្ទ វានឹងបញ្ជូនសំណួរចុងក្រោយទៅវិញ
+                const saved = localStorage.getItem("active_quiz_questions");
+                if (saved) {
+                  client.publish(MQTT_TOPIC, JSON.stringify({ type: "SET_QUESTIONS", payload: JSON.parse(saved) }));
+                }
               }
             } catch (e) {}
           });
@@ -324,7 +346,59 @@
           setEditingQuestions(updated);
         };
 
-        // មុខងារ Parse សំណួរពី Text/Word/Excel ដោយស្វ័យប្រវត្តិ
+        // មុខងារទាញសំណួរចេញជាឯកសារ Word (.doc)
+        const handleExportToWord = () => {
+          if (editingQuestions.length === 0) return alert("គ្មានសំណួរសម្រាប់ទាញយកទេ!");
+
+          let htmlContent = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head>
+              <meta charset='utf-8'>
+              <title>${appTitle}</title>
+              <style>
+                body { font-family: 'Kantumruy Pro', 'Khmer OS Siemreap', Arial, sans-serif; line-height: 1.6; }
+                h2 { text-align: center; color: #1e3a8a; }
+                .q-item { margin-bottom: 20px; }
+                .q-title { font-weight: bold; font-size: 14pt; }
+                .opt-list { margin-left: 20px; }
+                .correct { color: #047857; font-weight: bold; }
+              </style>
+            </head>
+            <body>
+              <h2>កម្រងសំណួរ៖ ${appTitle}</h2>
+              <p style="text-align:center; font-size:11pt; color:#6b7280;">រៀបចំដោយ៖ អ៊ាង យ៉ាឌីន ICTព្រៃវែង | សរុប ${editingQuestions.length} សំណួរ</p>
+              <hr/>
+          `;
+
+          editingQuestions.forEach((q, idx) => {
+            htmlContent += `
+              <div class="q-item">
+                <div class="q-title">សំណួរទី ${idx + 1}៖ ${q.question}</div>
+                <div class="opt-list">
+                  ${q.options.map((opt, oIdx) => {
+                    const khLetters = ['ក', 'ខ', 'គ', 'ឃ'];
+                    const isAns = opt === q.answer;
+                    return `<p class="${isAns ? 'correct' : ''}">${khLetters[oIdx]}. ${opt} ${isAns ? ' (✓ ចម្លើយត្រឹមត្រូវ)' : ''}</p>`;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+          });
+
+          htmlContent += `</body></html>`;
+
+          const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${appTitle}_សំណួរ.doc`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        };
+
+        // មុខងារ Parse សំណួរពី Text/Word/Excel
         const handleProcessBulkImport = () => {
           if (!bulkText.trim()) return alert("សូមបិទភ្ជាប់ (Paste) អត្ថបទសំណួររបស់អ្នកជាមុនសិន!");
 
@@ -333,7 +407,6 @@
           let currentItem = null;
 
           lines.forEach(line => {
-            // សម្គាល់សំណួរ (ផ្ដើមដោយ សំណួរទី, លេខ 1., 1) ឬ ?)
             const isQuestion = /^(សំណួរ|\d+[\.\)\:\-]|Question)/i.test(line) || (!currentItem && line.endsWith("?"));
             
             if (isQuestion || (currentItem && currentItem.options.length >= 4)) {
@@ -351,7 +424,7 @@
               const cleanOpt = line.replace(/^([a-dA-Dក-ឃ១-៤][\.\)\:\-]|[-*•])\s*/i, "").trim();
               if (cleanOpt) {
                 currentItem.options.push(cleanOpt);
-                if (!currentItem.answer) currentItem.answer = cleanOpt; // Default ចម្លើយទី ១
+                if (!currentItem.answer) currentItem.answer = cleanOpt;
               }
             }
           });
@@ -361,7 +434,7 @@
           }
 
           if (parsed.length === 0) {
-            return alert("ប្រព័ន្ធរកមិនឃើញទម្រង់សំណួរត្រឹមត្រូវទេ! សូមពិនិត្យមើលគំរូខាងក្រោម។");
+            return alert("ប្រព័ន្ធរកមិនឃើញទម្រង់សំណួរត្រឹមត្រូវទេ!");
           }
 
           setEditingQuestions(parsed);
@@ -370,33 +443,11 @@
           alert(`ជោគជ័យ! បានទាញយកសំណួរចំនួន ${parsed.length} សំណួររួចរាល់។ សូមពិនិត្យ និងចុចរើសចម្លើយត្រឹមត្រូវ (Radio Button) រួចចុច Save!`);
         };
 
-        // មុខងារ Upload ឯកសារ JSON
-        const handleFileUpload = (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            try {
-              const data = JSON.parse(event.target.result);
-              if (Array.isArray(data) && data.length > 0) {
-                setEditingQuestions(data);
-                setShowImportModal(false);
-                alert(`បាន Upload សំណួរចំនួន ${data.length} ដោយជោគជ័យ!`);
-              } else {
-                alert("ទម្រង់ឯកសារ JSON មិនត្រឹមត្រូវ!");
-              }
-            } catch (err) {
-              alert("មិនអាចអានឯកសារនេះបានទេ!");
-            }
-          };
-          reader.readAsText(file);
-        };
-
         const handleSaveAndActivate = () => {
           setActiveQuestions(editingQuestions);
           localStorage.setItem("active_quiz_questions", JSON.stringify(editingQuestions));
           sendMqttMessage("SET_QUESTIONS", editingQuestions);
-          alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបាន Update ទៅទូរស័ព្ទសិស្សទាំងអស់រួចរាល់។`);
+          alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបានផ្សាយឡើង Cloud រួចរាល់។ សិស្សនៅលើទូរស័ព្ទគ្រាន់តែចុច Refresh នឹងឃើញសំណួរថ្មីភ្លាមៗ!`);
           setAdminTab("podium");
         };
 
@@ -545,7 +596,7 @@
           const top3 = leaderboard[2];
 
           return (
-            <div className={`min-h-screen p-4 md:p-6 flex flex-col justify-between relative ${themeBg}`}>
+            <div className={`min-h-screen p-3 md:p-6 flex flex-col justify-between relative ${themeBg}`}>
               {hideHeader && (
                 <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
                   <button
@@ -585,9 +636,9 @@
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/80 text-emerald-400 font-semibold">
+                    <span className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/80 text-emerald-400 font-semibold">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                      Cloud Sync ជាប់
+                      {cloudStatus}
                     </span>
                     <button
                       onClick={toggleTheme}
@@ -595,7 +646,7 @@
                         isDark ? "bg-slate-800 border-slate-700 text-amber-300" : "bg-slate-100 border-slate-300 text-slate-700"
                       }`}
                     >
-                      {isDark ? "☀️ ផ្ទៃភ្លឺ" : "🌙 ផ្ទៃងងឹត"}
+                      {isDark ? "☀️" : "🌙"}
                     </button>
                     <button
                       onClick={() => setHideHeader(true)}
@@ -626,7 +677,7 @@
                       🏆 {appTitle}
                     </h1>
                     <p className={`text-xs mt-1 ${subText}`}>
-                      ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ + ប្រើពេលតិចជាងគេ (លឿនជាងគេ) | 📡 Real-time Sync Online
+                      ⚡ ចំណាត់ថ្នាក់គិតលើ៖ ឆ្លើយត្រូវច្រើនជាងគេ + ប្រើពេលតិចជាងគេ (លឿនជាងគេ) | 📡 Real-time Live
                     </p>
                     {leaderboard.length < 3 ? (
                       <div className="inline-block mt-2 px-3 py-1 bg-purple-950/40 border border-purple-800/50 rounded-full text-[11px] text-purple-300 font-medium">
@@ -722,20 +773,21 @@
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-2">
                       <button
-                        onClick={() => setShowImportModal(true)}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-lg flex items-center gap-1.5"
+                        onClick={handleExportToWord}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5"
+                        title="ទាញយកសំណួរទាំងអស់ជាឯកសារ Word (.doc)"
                       >
-                        ⚡ បញ្ចូលសំណួររហ័ស (Bulk/Upload)
+                        📄 ទាញយកជា Word
                       </button>
                       <button
-                        onClick={handleRestoreDefault}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-xl text-xs font-bold transition"
+                        onClick={() => setShowImportModal(true)}
+                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-lg flex items-center gap-1.5"
                       >
-                        🔄 យកសំណួរដើម
+                        ⚡ បញ្ចូលសំណួររហ័ស (Bulk)
                       </button>
                       <button
                         onClick={handleAddNewQuestion}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5"
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2.5 rounded-xl text-xs font-bold transition"
                       >
                         ➕ ថែមសំណួរ
                       </button>
@@ -753,26 +805,26 @@
                       <div key={q.id || qIdx} className={`border p-5 rounded-3xl shadow-xl space-y-4 ${cardBg}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 flex items-center gap-3">
-                            <span className="bg-purple-950 text-purple-400 border border-purple-800 w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm">
+                            <span className="bg-purple-950 text-purple-400 border border-purple-800 w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">
                               {qIdx + 1}
                             </span>
-                            <input
-                              type="text"
+                            <textarea
+                              rows="2"
                               value={q.question}
                               onChange={(e) => handleQuestionChange(qIdx, e.target.value)}
                               placeholder="វាយប្រធានសំណួរនៅទីនេះ..."
-                              className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 ${inputBg}`}
+                              className={`w-full border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-purple-500 ${inputBg}`}
                             />
                           </div>
                           <button
                             onClick={() => handleDeleteQuestion(qIdx)}
-                            className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 p-2.5 rounded-xl transition"
+                            className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 p-2.5 rounded-xl transition shrink-0"
                           >
                             🗑️
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-11">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-0 md:pl-11">
                           {q.options.map((opt, optIdx) => (
                             <div
                               key={optIdx}
@@ -785,8 +837,7 @@
                                 name={`correct-ans-${qIdx}`}
                                 checked={q.answer === opt}
                                 onChange={() => handleSetCorrectAnswer(qIdx, opt)}
-                                className="accent-emerald-500 w-4 h-4 cursor-pointer"
-                                title="ចុចជ្រើសរើសជាចម្លើយត្រឹមត្រូវ"
+                                className="accent-emerald-500 w-4 h-4 cursor-pointer shrink-0"
                               />
                               <input
                                 type="text"
@@ -798,7 +849,7 @@
                                 }`}
                               />
                               {q.answer === opt && (
-                                <span className="text-emerald-500 text-xs font-bold pr-2">✓ ត្រូវ</span>
+                                <span className="text-emerald-500 text-xs font-bold pr-2 shrink-0">✓ ត្រូវ</span>
                               )}
                             </div>
                           ))}
@@ -809,63 +860,45 @@
                 </div>
               )}
 
-              {/* MODAL បញ្ចូលសំណួររហ័ស (BULK IMPORT / UPLOAD) */}
+              {/* MODAL BULK IMPORT */}
               {showImportModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className={`max-w-2xl w-full rounded-3xl border p-6 shadow-2xl space-y-4 ${cardBg}`}>
                     <div className="flex justify-between items-center border-b pb-3 border-slate-800">
                       <div>
-                        <h3 className="text-lg font-bold text-amber-400">⚡ បញ្ចូលកម្រងសំណួររហ័ស (Fast Bulk Import)</h3>
-                        <p className={`text-xs ${subText}`}>ចម្លងពី Word, Excel ឬ ChatGPT/Gemini រួចបិទភ្ជាប់ (Paste) ចូលទីនេះភ្លាមៗ</p>
+                        <h3 className="text-lg font-bold text-amber-400">⚡ បញ្ចូលសំណួររហ័ស (Bulk Import)</h3>
+                        <p className={`text-xs ${subText}`}>ចម្លងពី Word, Excel ឬ AI រួចបិទភ្ជាប់ (Paste) ចូលទីនេះភ្លាមៗ</p>
                       </div>
                       <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs font-bold text-slate-300">បិទភ្ជាប់អត្ថបទសំណួរ (Paste Text)៖</label>
-                        <label className="text-xs text-indigo-400 hover:underline cursor-pointer">
-                          📁 Upload File JSON
-                          <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
-                        </label>
-                      </div>
-                      <textarea
-                        rows="8"
-                        value={bulkText}
-                        onChange={(e) => setBulkText(e.target.value)}
-                        placeholder={`ឧទាហរណ៍ទម្រង់ដែលត្រូវ Paste ចូល៖
+                    <textarea
+                      rows="8"
+                      value={bulkText}
+                      onChange={(e) => setBulkText(e.target.value)}
+                      placeholder={`ឧទាហរណ៍ទម្រង់៖
 
 សំណួរទី ១៖ តើព្យញ្ជនៈខ្មែរមានប៉ុន្មានតួ?
 ក. ៣១ តួ
 ខ. ៣២ តួ
 គ. ៣៣ តួ
-ឃ. ៣៤ តួ
+ឃ. ៣៤ តួ`}
+                      className={`w-full border rounded-2xl p-4 text-xs focus:outline-none focus:border-indigo-500 font-mono leading-relaxed ${inputBg}`}
+                    ></textarea>
 
-សំណួរទី ២៖ តើពាក្យណាជាពាក្យត្រឹមត្រូវ?
-ក. សាលារៀន
-ខ. សាលារៀនន
-គ. សាលារៀនម
-ឃ. សាលារៀនង`}
-                        className={`w-full border rounded-2xl p-4 text-xs focus:outline-none focus:border-indigo-500 font-mono leading-relaxed ${inputBg}`}
-                      ></textarea>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                      <span className={`text-[11px] ${subText}`}>💡 ពេលបំលែងរួច អ្នកគ្រាន់តែចុចរើសចម្លើយត្រូវ (✓ ត្រូវ) លើសំណួរនីមួយៗជាការស្រេច!</span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setShowImportModal(false)}
-                          className="px-4 py-2 rounded-xl text-xs bg-slate-800 text-slate-300 hover:bg-slate-700"
-                        >
-                          បោះបង់
-                        </button>
-                        <button
-                          onClick={handleProcessBulkImport}
-                          className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30"
-                        >
-                          បំលែងចូលប្រព័ន្ធ 🚀
-                        </button>
-                      </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setShowImportModal(false)}
+                        className="px-4 py-2 rounded-xl text-xs bg-slate-800 text-slate-300"
+                      >
+                        បោះបង់
+                      </button>
+                      <button
+                        onClick={handleProcessBulkImport}
+                        className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white"
+                      >
+                        បំលែងចូលប្រព័ន្ធ 🚀
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -875,11 +908,11 @@
         }
 
         // =========================================================================
-        // ផ្ទាំងសិស្សចូលលេង (STUDENT VIEW)
+        // ផ្ទាំងសិស្សចូលលេង (MOBILE RESPONSIVE UI សមស្របគ្រប់ម៉ូដទូរស័ព្ទ)
         // =========================================================================
         return (
-          <div className={`flex flex-col items-center justify-center min-h-screen p-4 relative ${themeBg}`}>
-            <div className="absolute top-4 right-4">
+          <div className={`flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 relative ${themeBg}`}>
+            <div className="absolute top-3 right-3">
               <button
                 onClick={() => { window.location.hash = "#admin"; setIsTeacher(true); }}
                 className="text-[11px] bg-slate-800/60 hover:bg-slate-700/80 text-slate-400 border border-slate-700/70 px-3 py-1.5 rounded-xl transition flex items-center gap-1"
@@ -890,12 +923,12 @@
             </div>
 
             {!started ? (
-              <div className={`p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl relative ${cardBg}`}>
-                <div className="text-6xl mb-4 animate-bounce">⚡</div>
-                <h1 className="text-xl md:text-2xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+              <div className={`p-6 sm:p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl relative ${cardBg}`}>
+                <div className="text-5xl sm:text-6xl mb-3 animate-bounce">⚡</div>
+                <h1 className="text-lg sm:text-2xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 leading-snug">
                   {appTitle}
                 </h1>
-                <p className={`text-xs mb-6 ${subText}`}>
+                <p className={`text-xs mb-5 ${subText}`}>
                   ⏱️ ២០ វិនាទីក្នុង ១ សំណួរ | ឆ្លើយត្រូវ និងលឿនជាងគេដើម្បីបានពាន!
                 </p>
                 <input
@@ -904,52 +937,52 @@
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && startStudentGame()}
-                  className={`w-full border rounded-xl p-3.5 text-center text-lg mb-4 focus:outline-none focus:border-purple-500 ${inputBg}`}
+                  className={`w-full border rounded-2xl p-3.5 text-center text-base sm:text-lg mb-4 focus:outline-none focus:border-purple-500 ${inputBg}`}
                 />
                 <button
                   onClick={startStudentGame}
                   disabled={!userName.trim()}
-                  className={`w-full py-3.5 rounded-xl font-bold transition shadow-lg ${
-                    userName.trim() ? "bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30" : "bg-slate-800 text-slate-600 cursor-not-allowed"
+                  className={`w-full py-3.5 rounded-2xl font-bold transition shadow-lg text-sm sm:text-base ${
+                    userName.trim() ? "bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30 active:scale-95" : "bg-slate-800 text-slate-600 cursor-not-allowed"
                   }`}
                 >
                   ចូលរួមប្រកួត 🚀
                 </button>
 
-                <div className="mt-8 pt-4 border-t border-slate-800/60 flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                <div className="mt-6 pt-4 border-t border-slate-800/60 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
                   <span>បង្កើតឡើងដោយ៖</span>
                   <span className="font-bold text-amber-400">អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
                 </div>
               </div>
             ) : currentQ < shuffledQuestions.length ? (
-              <div className="w-full max-w-xl flex flex-col gap-4">
-                <div className={`flex justify-between items-center border px-5 py-3 rounded-2xl ${cardBg}`}>
-                  <span className="text-xs font-bold bg-purple-950 text-purple-300 border border-purple-800 px-3 py-1.5 rounded-full">
-                    សំណួរទី {currentQ + 1} / {shuffledQuestions.length}
+              <div className="w-full max-w-lg flex flex-col gap-3">
+                <div className={`flex justify-between items-center border px-4 py-2.5 rounded-2xl ${cardBg}`}>
+                  <span className="text-[11px] font-bold bg-purple-950 text-purple-300 border border-purple-800 px-3 py-1 rounded-full">
+                    {currentQ + 1} / {shuffledQuestions.length}
                   </span>
 
-                  <div className={`flex items-center gap-1.5 font-black text-lg ${timeLeft <= 5 ? "timer-warn" : "text-amber-400"}`}>
+                  <div className={`flex items-center gap-1 font-black text-base ${timeLeft <= 5 ? "timer-warn" : "text-amber-400"}`}>
                     <span>⏱️</span>
                     <span>{timeLeft}s</span>
                   </div>
 
-                  <span className="text-sm font-semibold">👤 {userName}</span>
+                  <span className="text-xs font-semibold truncate max-w-[110px]">👤 {userName}</span>
                 </div>
 
-                <div className={`border p-6 md:p-8 rounded-3xl text-center shadow-xl min-h-[140px] flex items-center justify-center ${cardBg}`}>
-                  <h2 className="text-lg md:text-xl font-bold leading-relaxed">
+                <div className={`border p-5 sm:p-6 rounded-3xl text-center shadow-xl min-h-[110px] flex items-center justify-center ${cardBg}`}>
+                  <h2 className="text-base sm:text-lg font-bold leading-relaxed">
                     {shuffledQuestions[currentQ].question}
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-2.5 sm:gap-3">
                   {shuffledQuestions[currentQ].options.map((opt, index) => {
                     const color = kahootColors[index % 4];
                     let extraStyle = `${color.bg} ${color.border} text-white`;
 
                     if (answered) {
                       if (opt === shuffledQuestions[currentQ].answer) {
-                        extraStyle = "bg-emerald-500 border-emerald-400 ring-4 ring-emerald-300 text-white scale-[1.02]";
+                        extraStyle = "bg-emerald-500 border-emerald-400 ring-4 ring-emerald-300 text-white scale-[1.01]";
                       } else if (selectedOpt === opt) {
                         extraStyle = "bg-rose-700 border-rose-600 opacity-60 text-white";
                       } else {
@@ -962,34 +995,34 @@
                         key={index}
                         onClick={() => handleAnswer(opt)}
                         disabled={answered}
-                        className={`p-5 rounded-2xl border-b-4 font-bold text-base flex items-center gap-3 transition-all active:scale-95 shadow-md ${extraStyle}`}
+                        className={`p-4 sm:p-4.5 rounded-2xl border-b-4 font-bold text-sm sm:text-base flex items-center gap-3 transition-all active:scale-95 shadow-md text-left ${extraStyle}`}
                       >
-                        <span className="text-xl opacity-80">{color.shape}</span>
-                        <span className="text-left flex-1">{opt}</span>
+                        <span className="text-lg opacity-80 shrink-0">{color.shape}</span>
+                        <span className="flex-1 leading-snug">{opt}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
             ) : (
-              <div className={`border p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl ${cardBg}`}>
-                <div className="text-7xl mb-3 animate-pulse">🏆</div>
-                <h2 className="text-2xl font-black mb-1">អបអរសាទរ {userName}!</h2>
+              <div className={`border p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl ${cardBg}`}>
+                <div className="text-6xl mb-2 animate-pulse">🏆</div>
+                <h2 className="text-xl font-black mb-1">អបអរសាទរ {userName}!</h2>
                 <p className={`text-xs mb-4 ${subText}`}>អ្នកបានឆ្លើយចប់សំណួរទាំងអស់</p>
 
-                <div className={`border p-5 rounded-2xl mb-4 ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
-                  <span className={`text-xs uppercase tracking-widest font-bold ${subText}`}>ពិន្ទុទទួលបាន</span>
-                  <div className="text-4xl font-black text-amber-400 my-1">
-                    {score} <span className={`text-base font-normal ${subText}`}>ពិន្ទុ</span>
+                <div className={`border p-4 rounded-2xl mb-4 ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
+                  <span className={`text-[11px] uppercase tracking-widest font-bold ${subText}`}>ពិន្ទុទទួលបាន</span>
+                  <div className="text-3xl font-black text-amber-400 my-1">
+                    {score} <span className={`text-sm font-normal ${subText}`}>ពិន្ទុ</span>
                   </div>
                   <span className="text-xs text-purple-400">⏱️ ប្រើពេលសរុប៖ {totalTimeSpent} វិនាទី</span>
                 </div>
 
-                <div className="p-3.5 bg-purple-950/40 border border-purple-800/50 rounded-xl text-xs text-purple-300 leading-relaxed">
+                <div className="p-3 bg-purple-950/40 border border-purple-800/50 rounded-xl text-xs text-purple-300 leading-relaxed">
                   📢 លទ្ធផលត្រូវបានបញ្ជូនទៅផ្ទាំងធំ (Podium) របស់គ្រូរួចរាល់ហើយ!
                 </div>
 
-                <div className="mt-6 pt-3 border-t border-slate-800/50 text-[11px] text-slate-500">
+                <div className="mt-5 pt-3 border-t border-slate-800/50 text-[11px] text-slate-500">
                   កម្មវិធីរៀបចំដោយ៖ <span className="font-bold text-amber-400">អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
                 </div>
               </div>
