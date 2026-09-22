@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>តេស្តកញ្ចប់អំណាន - អ៊ាង យ៉ាឌីន ICTព្រៃវែង</title>
-    <!-- បិទ Cache របស់ Browser ដាច់ខាត ដើម្បីឱ្យទូរស័ព្ទ Refresh ចេញសំណួរថ្មីភ្លាមៗ -->
+    <!-- បិទ Cache ដាច់ខាត -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -47,7 +47,6 @@
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
 
-      // MQTT Cloud Channel សម្រាប់សាលារបស់លោកគ្រូ
       const MQTT_TOPIC = "ict_preyveng_quiz_sync_live_v3";
       const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 
@@ -140,7 +139,6 @@
         return copy;
       };
 
-      // សំណួរគំរូដើមដែលលោកគ្រូកំពុងប្រើ
       const DEFAULT_QUESTIONS = [
         {
           id: 1,
@@ -164,14 +162,19 @@
         };
 
         const [isTeacher, setIsTeacher] = useState(checkIsTeacher);
-        const [adminPass, setAdminPass] = useState('');
+        const [adminPassInput, setAdminPassInput] = useState('');
+        
+        // លេខសម្ងាត់រក្សាទុកក្នុង LocalStorage (លេខដើម: 1234)
+        const [currentPin, setCurrentPin] = useState(() => {
+          return localStorage.getItem('quiz_teacher_pin') || '1234';
+        });
+
         const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [adminTab, setAdminTab] = useState('podium');
         const [hideHeader, setHideHeader] = useState(false);
         const [isDark, setIsDark] = useState(() => localStorage.getItem('quiz_theme') !== 'light');
         const [appTitle, setAppTitle] = useState(() => localStorage.getItem('quiz_app_title') || 'តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
 
-        // សំណួរដែលសកម្ម
         const [activeQuestions, setActiveQuestions] = useState(() => {
           try {
             const saved = localStorage.getItem('active_quiz_questions');
@@ -192,9 +195,15 @@
         });
 
         const [showImportModal, setShowImportModal] = useState(false);
+        const [showPinModal, setShowPinModal] = useState(false);
         const [bulkText, setBulkText] = useState('');
-        const [cloudStatus, setCloudStatus] = useState('កំពុងភ្ជាប់...');
+        
+        // State សម្រាប់ផ្ទាំងប្តូរលេខកូដ
+        const [oldPinInput, setOldPinInput] = useState('');
+        const [newPinInput, setNewPinInput] = useState('');
+        const [confirmPinInput, setConfirmPinInput] = useState('');
 
+        const [cloudStatus, setCloudStatus] = useState('កំពុងភ្ជាប់...');
         const mqttClientRef = useRef(null);
 
         const [userName, setUserName] = useState('');
@@ -214,7 +223,6 @@
           });
         };
 
-        // តភ្ជាប់ Real-time Cloud និងដោះស្រាយបញ្ហា Cache ទូរស័ព្ទ
         useEffect(() => {
           const clientId = "quiz_dev_" + Math.random().toString(16).substring(2, 9);
           const client = mqtt.connect(MQTT_BROKER, {
@@ -229,7 +237,6 @@
           client.on("connect", () => {
             setCloudStatus("Cloud Sync ជាប់");
             client.subscribe(MQTT_TOPIC);
-            // ប្រសិនបើជាសិស្សលើទូរស័ព្ទដៃ សូមសួររកសំណួរថ្មីចុងក្រោយពី Cloud ភ្លាម
             client.publish(MQTT_TOPIC, JSON.stringify({ type: "REQ_LATEST_QUIZ" }));
           });
 
@@ -248,7 +255,6 @@
                 setLeaderboard([]);
                 localStorage.removeItem("kahoot_board");
               } else if (packet.type === "SET_QUESTIONS") {
-                // សំណួរថ្មីរត់ចូលទូរស័ព្ទសិស្សភ្លាមៗ ដោយមិនបាច់ Refresh
                 setActiveQuestions(packet.payload);
                 setEditingQuestions(packet.payload);
                 localStorage.setItem("active_quiz_questions", JSON.stringify(packet.payload));
@@ -256,7 +262,6 @@
                 setAppTitle(packet.payload);
                 localStorage.setItem("quiz_app_title", packet.payload);
               } else if (packet.type === "REQ_LATEST_QUIZ") {
-                // ប្រសិនបើកុំព្យូទ័រគ្រូទទួលបានការទាមទារពីទូរស័ព្ទ វានឹងបញ្ជូនសំណួរចុងក្រោយទៅវិញ
                 const saved = localStorage.getItem("active_quiz_questions");
                 if (saved) {
                   client.publish(MQTT_TOPIC, JSON.stringify({ type: "SET_QUESTIONS", payload: JSON.parse(saved) }));
@@ -290,10 +295,11 @@
         };
 
         const handleLoginAdmin = () => {
-          if (adminPass === "1234") {
+          if (adminPassInput === currentPin) {
             setIsLoggedIn(true);
+            setAdminPassInput('');
           } else {
-            alert("កូដសម្ងាត់មិនត្រូវទេ!");
+            alert("លេខសម្ងាត់មិនត្រឹមត្រូវទេ!");
           }
         };
 
@@ -301,6 +307,27 @@
           setIsLoggedIn(false);
           setIsTeacher(false);
           window.location.hash = "";
+        };
+
+        // មុខងារប្តូរលេខកូដសម្ងាត់
+        const handleChangePin = () => {
+          if (oldPinInput !== currentPin) {
+            return alert("លេខសម្ងាត់ចាស់មិនត្រឹមត្រូវទេ!");
+          }
+          if (!newPinInput.trim() || newPinInput.length < 4) {
+            return alert("លេខសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច ៤ ខ្ទង់ឡើងទៅ!");
+          }
+          if (newPinInput !== confirmPinInput) {
+            return alert("ការផ្ទៀងផ្ទាត់លេខសម្ងាត់ថ្មីមិនត្រូវគ្នាទេ!");
+          }
+
+          setCurrentPin(newPinInput);
+          localStorage.setItem('quiz_teacher_pin', newPinInput);
+          setShowPinModal(false);
+          setOldPinInput('');
+          setNewPinInput('');
+          setConfirmPinInput('');
+          alert("ជោគជ័យ! លេខសម្ងាត់ថ្មីត្រូវបានរក្សាទុករួចរាល់។ សូមចងចាំលេខកូដនេះសម្រាប់ការចូលលើកក្រោយ!");
         };
 
         const handleTitleChange = (newTitle) => {
@@ -346,7 +373,6 @@
           setEditingQuestions(updated);
         };
 
-        // មុខងារទាញសំណួរចេញជាឯកសារ Word (.doc)
         const handleExportToWord = () => {
           if (editingQuestions.length === 0) return alert("គ្មានសំណួរសម្រាប់ទាញយកទេ!");
 
@@ -398,7 +424,6 @@
           URL.revokeObjectURL(url);
         };
 
-        // មុខងារ Parse សំណួរពី Text/Word/Excel
         const handleProcessBulkImport = () => {
           if (!bulkText.trim()) return alert("សូមបិទភ្ជាប់ (Paste) អត្ថបទសំណួររបស់អ្នកជាមុនសិន!");
 
@@ -460,7 +485,7 @@
         };
 
         const handleRestoreDefault = () => {
-          if (confirm("តើអ្នកចង់ទាញយកសំណួរគំរូដើមទាំង ៥ មកវិញមែនទេ?")) {
+          if (confirm("តើអ្នកចង់ទាញយកសំណួរគំរូដើមមកវិញមែនទេ?")) {
             setEditingQuestions(DEFAULT_QUESTIONS);
             setActiveQuestions(DEFAULT_QUESTIONS);
             localStorage.setItem("active_quiz_questions", JSON.stringify(DEFAULT_QUESTIONS));
@@ -565,18 +590,18 @@
                 <div className={`p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl ${cardBg}`}>
                   <div className="text-5xl mb-4">🔐</div>
                   <h2 className="text-xl font-bold mb-2">ចូលផ្ទាំងគ្រូបង្រៀន</h2>
-                  <p className={`text-xs mb-6 ${subText}`}>វាយលេខសម្ងាត់ (1234)</p>
+                  <p className={`text-xs mb-6 ${subText}`}>សូមវាយលេខកូដសម្ងាត់ផ្ទាល់ខ្លួន</p>
                   <input
                     type="password"
-                    placeholder="PIN: 1234"
-                    value={adminPass}
-                    onChange={(e) => setAdminPass(e.target.value)}
+                    placeholder="••••••••"
+                    value={adminPassInput}
+                    onChange={(e) => setAdminPassInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleLoginAdmin()}
-                    className={`w-full border rounded-xl p-3 text-center mb-4 focus:outline-none focus:border-purple-500 ${inputBg}`}
+                    className={`w-full border rounded-xl p-3 text-center mb-4 focus:outline-none focus:border-purple-500 tracking-widest text-lg ${inputBg}`}
                   />
                   <button
                     onClick={handleLoginAdmin}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition shadow-lg mb-2"
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition shadow-lg mb-3"
                   >
                     ចូលប្រព័ន្ធ
                   </button>
@@ -640,6 +665,16 @@
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
                       {cloudStatus}
                     </span>
+                    
+                    {/* ប៊ូតុងប្តូរលេខកូដសម្ងាត់ */}
+                    <button
+                      onClick={() => setShowPinModal(true)}
+                      className="bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                      title="ប្តូរលេខសម្ងាត់សម្រាប់ចូលផ្ទាំងគ្រូ"
+                    >
+                      🔐 ប្តូរលេខកូដ
+                    </button>
+
                     <button
                       onClick={toggleTheme}
                       className={`p-2 rounded-xl border text-sm transition ${
@@ -903,12 +938,75 @@
                   </div>
                 </div>
               )}
+
+              {/* MODAL ប្តូរលេខសម្ងាត់ (CHANGE PIN MODAL) */}
+              {showPinModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className={`max-w-sm w-full rounded-3xl border p-6 shadow-2xl space-y-4 ${cardBg}`}>
+                    <div className="flex justify-between items-center border-b pb-3 border-slate-800">
+                      <h3 className="text-base font-bold text-amber-400 flex items-center gap-2">
+                        <span>🔐</span>
+                        <span>ប្តូរលេខសម្ងាត់គ្រូបង្រៀន</span>
+                      </h3>
+                      <button onClick={() => setShowPinModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-slate-300 block mb-1">លេខសម្ងាត់ចាស់៖</label>
+                        <input
+                          type="password"
+                          placeholder="••••"
+                          value={oldPinInput}
+                          onChange={(e) => setOldPinInput(e.target.value)}
+                          className={`w-full border rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500 ${inputBg}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-300 block mb-1">លេខសម្ងាត់ថ្មី (យ៉ាងតិច ៤ ខ្ទង់)៖</label>
+                        <input
+                          type="password"
+                          placeholder="••••"
+                          value={newPinInput}
+                          onChange={(e) => setNewPinInput(e.target.value)}
+                          className={`w-full border rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500 ${inputBg}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-300 block mb-1">ផ្ទៀងផ្ទាត់លេខសម្ងាត់ថ្មី៖</label>
+                        <input
+                          type="password"
+                          placeholder="••••"
+                          value={confirmPinInput}
+                          onChange={(e) => setConfirmPinInput(e.target.value)}
+                          className={`w-full border rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500 ${inputBg}`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        onClick={() => setShowPinModal(false)}
+                        className="px-4 py-2 rounded-xl text-xs bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      >
+                        បោះបង់
+                      </button>
+                      <button
+                        onClick={handleChangePin}
+                        className="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-lg"
+                      >
+                        រក្សាទុកលេខកូដ
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         }
 
         // =========================================================================
-        // ផ្ទាំងសិស្សចូលលេង (MOBILE RESPONSIVE UI សមស្របគ្រប់ម៉ូដទូរស័ព្ទ)
+        // ផ្ទាំងសិស្សចូលលេង
         // =========================================================================
         return (
           <div className={`flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 relative ${themeBg}`}>
