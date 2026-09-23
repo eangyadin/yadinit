@@ -191,21 +191,6 @@
         return copy;
       };
 
-      const DEFAULT_QUESTIONS = [
-        {
-          id: 1,
-          question: 'តើសំណួរប្រភេទណាដែលគ្រូបង្រៀនសួរទៅកាន់សិស្ស មុនពេលចាប់ផ្តើមអានអត្ថបទ ដើម្បីរំញោចការគិត និងទាក់ទាញចំណាប់អារម្មណ៍?',
-          options: ['សំណួរបំពេញចន្លោះ', 'សំណួរទស្សន៍ទាយ', 'សំណួរសង្ខេប', 'សំណួរវិភាគវេយ្យាករណ៍'],
-          answer: 'សំណួរទស្សន៍ទាយ'
-        },
-        {
-          id: 2,
-          question: 'ការឱ្យសិស្សឆ្លើយសំណួរអំពីមូលហេតុ អត្ថន័យបង្កប់ ឬព័ត៌មានលម្អិតដែលមាននៅក្នុងអត្ថបទ ត្រូវបានចាត់ចូលក្នុងយុទ្ធវិធីអ្វី?',
-          options: ['សំណួរយល់ន័យ', 'ការប្រើក្រាហ្វិក', 'ការសង្ខេបអត្ថបទ', 'ការស្វែងរកតួ'],
-          answer: 'សំណួរយល់ន័យ'
-        }
-      ];
-
       function App() {
         const checkIsTeacher = () => {
           const hash = window.location.hash;
@@ -222,6 +207,11 @@
         const [isDark, setIsDark] = useState(() => localStorage.getItem('quiz_theme') !== 'light');
         const [appTitle, setAppTitle] = useState(() => localStorage.getItem('quiz_app_title') || 'តេស្តកញ្ចប់អំណានថ្នាក់ទី១,២,៣');
 
+        // ស្ថានភាពបន្ទប់ប្រឡង (isOpen: true = បើកឱ្យសិស្សលេង, false = លោតថាមិនទាន់មានសំណួរ)
+        const [isRoomOpen, setIsRoomOpen] = useState(() => {
+          return localStorage.getItem('quiz_room_status') === 'open';
+        });
+
         const [liveDate, setLiveDate] = useState(getKhmerDateTime());
 
         useEffect(() => {
@@ -229,18 +219,26 @@
           return () => clearInterval(timer);
         }, []);
 
+        // បើគ្មានសំណួរ គឺទុកទទេ []
         const [activeQuestions, setActiveQuestions] = useState(() => {
           try {
             const saved = localStorage.getItem('active_quiz_questions');
             if (saved) {
               const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+              if (Array.isArray(parsed)) return parsed;
             }
           } catch (e) {}
-          return DEFAULT_QUESTIONS;
+          return [];
         });
 
-        const [editingQuestions, setEditingQuestions] = useState(() => activeQuestions);
+        const [editingQuestions, setEditingQuestions] = useState(() => activeQuestions.length > 0 ? activeQuestions : [
+          {
+            id: Date.now(),
+            question: 'សំណួរទី ១៖ ...',
+            options: ['ជម្រើសទី ១', 'ជម្រើសទី ២', 'ជម្រើសទី ៣', 'ជម្រើសទី ៤'],
+            answer: 'ជម្រើសទី ១'
+          }
+        ]);
         
         const [leaderboard, setLeaderboard] = useState(() => {
           try {
@@ -256,7 +254,6 @@
           } catch (e) { return []; }
         });
 
-        // បណ្ណាល័យកម្រងសំណួរតាមកាលបរិច្ឆេទ (Question Bank Archive)
         const [savedQuizBank, setSavedQuizBank] = useState(() => {
           try {
             const saved = localStorage.getItem('kahoot_saved_quizzes');
@@ -332,14 +329,19 @@
                 setActiveQuestions(packet.payload);
                 setEditingQuestions(packet.payload);
                 localStorage.setItem("active_quiz_questions", JSON.stringify(packet.payload));
+              } else if (packet.type === "SET_ROOM_STATUS") {
+                setIsRoomOpen(packet.payload);
+                localStorage.setItem("quiz_room_status", packet.payload ? "open" : "closed");
               } else if (packet.type === "SET_TITLE") {
                 setAppTitle(packet.payload);
                 localStorage.setItem("quiz_app_title", packet.payload);
               } else if (packet.type === "REQ_LATEST_QUIZ") {
                 const saved = localStorage.getItem("active_quiz_questions");
+                const savedStatus = localStorage.getItem("quiz_room_status") === "open";
                 if (saved) {
                   client.publish(MQTT_TOPIC, JSON.stringify({ type: "SET_QUESTIONS", payload: JSON.parse(saved) }));
                 }
+                client.publish(MQTT_TOPIC, JSON.stringify({ type: "SET_ROOM_STATUS", payload: savedStatus }));
               }
             } catch (e) {}
           });
@@ -381,6 +383,17 @@
           setIsLoggedIn(false);
           setIsTeacher(false);
           window.location.hash = "";
+        };
+
+        // កុងតាក់បើក/បិទ បន្ទប់ប្រឡង
+        const toggleRoomStatus = () => {
+          const nextStatus = !isRoomOpen;
+          if (nextStatus && activeQuestions.length === 0) {
+            return alert("សូមបង្កើតសំណួរ និងចុច «រក្សាទុក និងផ្សាយ» ជាមុនសិន ទើបអាចបើកឱ្យសិស្សលេងបាន!");
+          }
+          setIsRoomOpen(nextStatus);
+          localStorage.setItem("quiz_room_status", nextStatus ? "open" : "closed");
+          sendMqttMessage("SET_ROOM_STATUS", nextStatus);
         };
 
         const handleTriggerReveal = () => {
@@ -459,10 +472,9 @@
           }
         };
 
-        // មុខងារសម្អាតដើម្បីបង្កើតសំណួរថ្មីសន្លាង (ដោយស្វ័យប្រវត្តិកត់ទុកសំណួរចាស់ចូល Bank)
+        // មុខងារសម្អាតដើម្បីបង្កើតសំណួរថ្មីសន្លាង
         const handleClearForNewQuestions = () => {
           if (editingQuestions.length > 0) {
-            // កត់ត្រាសំណួរចាស់ចូល Bank ជាមុន
             const archiveQuiz = {
               id: Date.now(),
               title: appTitle,
@@ -477,6 +489,15 @@
             localStorage.setItem('kahoot_saved_quizzes', JSON.stringify(updatedBank));
           }
 
+          // បិទបន្ទប់ប្រឡងស្វ័យប្រវត្តិដើម្បីកុំឱ្យសិស្សចូលលេងបាន
+          setIsRoomOpen(false);
+          localStorage.setItem("quiz_room_status", "closed");
+          sendMqttMessage("SET_ROOM_STATUS", false);
+
+          setActiveQuestions([]);
+          localStorage.removeItem("active_quiz_questions");
+          sendMqttMessage("SET_QUESTIONS", []);
+
           setEditingQuestions([
             {
               id: Date.now(),
@@ -485,21 +506,23 @@
               answer: 'ជម្រើសទី ១'
             }
           ]);
-          alert("បានរក្សាទុកសំណួរចាស់ចូលទៅក្នុង «បណ្ណាល័យសំណួរ» រួចរាល់! ផ្ទាំងសំណួរត្រូវបានសម្អាតសម្រាប់លោកគ្រូវាយ ឬបិទភ្ជាប់ (Paste) សំណួរថ្មី។");
+          alert("បានរក្សាទុកសំណួរចាស់ចូលក្នុង «បណ្ណាល័យសំណួរ» រួចរាល់! ប្រព័ន្ធបានប្តូរស្ថានភាពទៅជា «មិនទាន់មានសំណួរ» សម្រាប់សិស្សរហូតដល់គ្រូចុចផ្សាយសំណួរថ្មី។");
         };
 
-        // មុខងារទាញយកសំណួរចាស់ពី Bank មកប្រើឡើងវិញ
         const handleRestoreQuizFromBank = (quizItem) => {
           if (confirm(`តើអ្នកចង់ទាញយកកម្រងសំណួរ «${quizItem.title}» (កាលបរិច្ឆេទ៖ ${quizItem.date}) មកប្រើឡើងវិញមែនទេ?`)) {
             setEditingQuestions(quizItem.questions);
             setActiveQuestions(quizItem.questions);
             setAppTitle(quizItem.title);
+            setIsRoomOpen(true);
             localStorage.setItem("active_quiz_questions", JSON.stringify(quizItem.questions));
             localStorage.setItem("quiz_app_title", quizItem.title);
+            localStorage.setItem("quiz_room_status", "open");
             sendMqttMessage("SET_QUESTIONS", quizItem.questions);
             sendMqttMessage("SET_TITLE", quizItem.title);
+            sendMqttMessage("SET_ROOM_STATUS", true);
             setShowQuizBankModal(false);
-            alert("បានទាញយក និងដាក់ឱ្យសិស្សលេងកម្រងសំណួរនេះជោគជ័យ!");
+            alert("បានទាញយក និងបើកឱ្យសិស្សលេងកម្រងសំណួរនេះជោគជ័យ!");
           }
         };
 
@@ -661,9 +684,10 @@
 
         const handleSaveAndActivate = () => {
           setActiveQuestions(editingQuestions);
+          setIsRoomOpen(true);
           localStorage.setItem("active_quiz_questions", JSON.stringify(editingQuestions));
+          localStorage.setItem("quiz_room_status", "open");
           
-          // រក្សាទុកកម្រងសំណួរនេះចូលទៅក្នុងបណ្ណាល័យស្វ័យប្រវត្តិ
           const currentArchive = {
             id: Date.now(),
             title: appTitle,
@@ -679,14 +703,17 @@
           localStorage.setItem('kahoot_saved_quizzes', JSON.stringify(updatedBank));
 
           sendMqttMessage("SET_QUESTIONS", editingQuestions);
-          alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបានផ្សាយឡើង Cloud រួចរាល់ និងបានកត់ចូលបណ្ណាល័យសំណួរ!`);
+          sendMqttMessage("SET_ROOM_STATUS", true);
+          alert(`ជោគជ័យ! សំណួរទាំង ${editingQuestions.length} ត្រូវបានផ្សាយ និងបើកបន្ទប់ឱ្យសិស្សលេងបានភ្លាមៗ!`);
           setAdminTab("podium");
         };
 
         const startStudentGame = () => {
           if (!userName.trim()) return;
-          const currentActive = activeQuestions.length > 0 ? activeQuestions : DEFAULT_QUESTIONS;
-          const randomized = shuffleArray(currentActive).map((q) => ({
+          if (!isRoomOpen || activeQuestions.length === 0) {
+            return alert("មិនទាន់មានសំណួរនៅឡើយទេ! សូមរង់ចាំលោកគ្រូបើកបន្ទប់ប្រឡង។");
+          }
+          const randomized = shuffleArray(activeQuestions).map((q) => ({
             ...q,
             options: shuffleArray(q.options),
           }));
@@ -860,15 +887,23 @@
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/80 text-emerald-400 font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                      {cloudStatus}
-                    </span>
+                    {/* កុងតាក់បើក/បិទ បន្ទប់ប្រឡងផ្ទាល់ */}
+                    <button
+                      onClick={toggleRoomStatus}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex items-center gap-1.5 ${
+                        isRoomOpen
+                          ? "bg-emerald-600/30 text-emerald-400 border-emerald-500/50 hover:bg-emerald-600/50"
+                          : "bg-rose-600/30 text-rose-400 border-rose-500/50 hover:bg-rose-600/50"
+                      }`}
+                      title="ចុចដើម្បី បើក/បិទ បន្ទប់ឱ្យសិស្សចូលលេង"
+                    >
+                      <span className={`w-2 h-2 rounded-full ${isRoomOpen ? 'bg-emerald-400 animate-ping' : 'bg-rose-400'}`}></span>
+                      <span>{isRoomOpen ? "បន្ទប់កំពុងបើក (Active)" : "បន្ទប់កំពុងបិទ (Inactive)"}</span>
+                    </button>
                     
                     <button
                       onClick={() => setShowPinModal(true)}
                       className="bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1"
-                      title="ប្តូរលេខសម្ងាត់សម្រាប់ចូលផ្ទាំងគ្រូ"
                     >
                       🔐 ប្តូរលេខកូដ
                     </button>
@@ -891,7 +926,6 @@
                     <button
                       onClick={handleStartNewRound}
                       className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-md transition flex items-center gap-1"
-                      title="រក្សាទុកទិន្នន័យជុំនេះទុកក្នុងប្រវត្តិ ហើយចាប់ផ្តើមជុំថ្មី"
                     >
                       🔄 ចាប់ផ្តើមជុំថ្មី
                     </button>
@@ -1159,7 +1193,7 @@
                 </div>
               )}
 
-              {/* MODAL បណ្ណាល័យសំណួរចាស់ៗតាមកាលបរិច្ឆេទ (QUIZ BANK MODAL) */}
+              {/* MODAL បណ្ណាល័យសំណួរចាស់ៗ */}
               {showQuizBankModal && (
                 <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className={`max-w-3xl w-full rounded-3xl border p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col ${cardBg}`}>
@@ -1385,7 +1419,7 @@
         }
 
         // =========================================================================
-        // ផ្ទាំងសិស្សចូលលេង
+        // ផ្ទាំងសិស្សចូលលេង (STUDENT VIEW)
         // =========================================================================
         return (
           <div className={`flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 relative ${themeBg}`}>
@@ -1399,7 +1433,27 @@
               </button>
             </div>
 
-            {!started ? (
+            {/* បើបន្ទប់បិទ ឬអត់ទាន់មានសំណួរ => បង្ហាញផ្ទាំងរង់ចាំស្អាតរស់រវើក */}
+            {!isRoomOpen || activeQuestions.length === 0 ? (
+              <div className={`p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl relative ${cardBg}`}>
+                <div className="text-6xl mb-4 animate-bounce">⏳</div>
+                <h2 className="text-xl font-black text-amber-400 mb-2">មិនទាន់មានសំណួរនៅឡើយទេ!</h2>
+                <div className="text-xs text-slate-300 leading-relaxed mb-6">
+                  លោកគ្រូកំពុងរៀបចំកម្រងសំណួរថ្មី...<br />
+                  សូមរង់ចាំបន្តិច ឬចុច <span className="text-amber-300 font-bold">Refresh</span> នៅពេលលោកគ្រូប្រកាសឱ្យចូលលេង។
+                </div>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full py-3 rounded-2xl font-bold bg-purple-600 hover:bg-purple-500 text-white text-xs transition shadow-lg flex items-center justify-center gap-2"
+                >
+                  <span>🔄</span>
+                  <span>ផ្ទុកទំព័រឡើងវិញ (Refresh)</span>
+                </button>
+                <div className="mt-6 pt-4 border-t border-slate-800/60 text-[11px] text-slate-500">
+                  រៀបចំដោយ៖ <span className="font-bold text-amber-400">អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
+                </div>
+              </div>
+            ) : !started ? (
               <div className={`p-6 sm:p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl relative ${cardBg}`}>
                 <div className="text-5xl sm:text-6xl mb-3 animate-bounce">⚡</div>
                 <h1 className="text-lg sm:text-2xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 leading-snug">
