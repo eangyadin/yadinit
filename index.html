@@ -39,8 +39,8 @@
         color: #ef4444 !important;
       }
       @keyframes popIn {
-        0% { transform: scale(0.3) translateY(60px); opacity: 0; }
-        70% { transform: scale(1.08) translateY(-8px); opacity: 1; }
+        0% { transform: scale(0.3) translateY(40px); opacity: 0; }
+        70% { transform: scale(1.08) translateY(-6px); opacity: 1; }
         100% { transform: scale(1) translateY(0); opacity: 1; }
       }
       @keyframes glowGold {
@@ -48,7 +48,7 @@
         50% { box-shadow: 0 0 45px rgba(245, 158, 11, 0.8), inset 0 0 25px rgba(254, 240, 138, 0.8); }
       }
       .animate-pop-in {
-        animation: popIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
       }
       .gold-podium-glow {
         animation: glowGold 2s infinite ease-in-out;
@@ -103,6 +103,18 @@
             gain.gain.setValueAtTime(0.04, ctx.currentTime);
             osc.start();
             osc.stop(ctx.currentTime + 0.04);
+          } else if (type === 'join') {
+            // សំឡេង Pop ពេលសិស្ស Join ចូលដូច Kahoot
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(320, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(640, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.15);
           } else if (type === 'correct') {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -238,9 +250,18 @@
           }
         ]);
         
+        // សិស្សដែលបាន Submit ចម្លើយរួច (Leaderboard)
         const [leaderboard, setLeaderboard] = useState(() => {
           try {
             const saved = localStorage.getItem('kahoot_board');
+            return saved ? JSON.parse(saved) : [];
+          } catch (e) { return []; }
+        });
+
+        // បញ្ជីឈ្មោះសិស្សដែលទើបតែ Join ចូលលេង (Lobby Joined Students)
+        const [joinedPlayers, setJoinedPlayers] = useState(() => {
+          try {
+            const saved = localStorage.getItem('kahoot_joined_players');
             return saved ? JSON.parse(saved) : [];
           } catch (e) { return []; }
         });
@@ -290,16 +311,11 @@
         const [totalTimeSpentMs, setTotalTimeSpentMs] = useState(0);
         const qStartTimeRef = useRef(0);
 
-        // ក្បួនតម្រៀបចំណាត់ថ្នាក់ ៤ ជាន់ (Strict Fair Tie-Breaker)
         const sortLeaderboard = (list) => {
           return [...list].sort((a, b) => {
-            // ១. ពិន្ទុខ្ពស់ជាងគេ
             if (b.score !== a.score) return b.score - a.score;
-            // ២. ពេលប្រើតិចជាងគេ (គិតដល់ ms)
             if (a.timeSpentMs !== b.timeSpentMs) return a.timeSpentMs - b.timeSpentMs;
-            // ៣. Streak វែងជាងគេ
             if ((b.maxStreak || 0) !== (a.maxStreak || 0)) return (b.maxStreak || 0) - (a.maxStreak || 0);
-            // ៤. Submit មុនគេ (Timestamp)
             return (a.timestamp || 0) - (b.timestamp || 0);
           });
         };
@@ -324,7 +340,18 @@
           client.on("message", (topic, message) => {
             try {
               const packet = JSON.parse(message.toString());
-              if (packet.type === "NEW_SCORE") {
+              if (packet.type === "PLAYER_JOINED") {
+                // សិស្ស Join ចូល Lobby ដូច Kahoot
+                setJoinedPlayers((prev) => {
+                  if (prev.some(p => p.name.trim().toLowerCase() === packet.payload.name.trim().toLowerCase())) {
+                    return prev;
+                  }
+                  playSound('join');
+                  const updated = [...prev, packet.payload];
+                  localStorage.setItem("kahoot_joined_players", JSON.stringify(updated));
+                  return updated;
+                });
+              } else if (packet.type === "NEW_SCORE") {
                 setLeaderboard((prev) => {
                   const filtered = prev.filter((p) => p.id !== packet.payload.id);
                   const updated = sortLeaderboard([...filtered, packet.payload]);
@@ -333,8 +360,10 @@
                 });
               } else if (packet.type === "CLEAR_SCORES") {
                 setLeaderboard([]);
+                setJoinedPlayers([]);
                 setPodiumRevealStep(0);
                 localStorage.removeItem("kahoot_board");
+                localStorage.removeItem("kahoot_joined_players");
               } else if (packet.type === "SET_QUESTIONS") {
                 setActiveQuestions(packet.payload);
                 setEditingQuestions(packet.payload);
@@ -452,8 +481,8 @@
         };
 
         const handleStartNewRound = () => {
-          if (leaderboard.length === 0) {
-            return alert("មិនទាន់មានលទ្ធផលក្នុងជុំនេះសម្រាប់រក្សាទុកនៅឡើយទេ!");
+          if (leaderboard.length === 0 && joinedPlayers.length === 0) {
+            return alert("មិនទាន់មានទិន្នន័យក្នុងជុំនេះសម្រាប់រក្សាទុកនៅឡើយទេ!");
           }
 
           if (confirm(`តើអ្នកពិតជាចង់រក្សាទុកលទ្ធផលអ្នកចូលរួមទាំង ${leaderboard.length} នាក់នេះ ចូលក្នុងប្រវត្តិ ហើយចាប់ផ្តើមជុំថ្មីមែនទេ?`)) {
@@ -473,8 +502,10 @@
             localStorage.setItem('kahoot_history_archives', JSON.stringify(updatedHistory));
 
             setLeaderboard([]);
+            setJoinedPlayers([]);
             setPodiumRevealStep(0);
             localStorage.removeItem('kahoot_board');
+            localStorage.removeItem('kahoot_joined_players');
             sendMqttMessage("CLEAR_SCORES", {});
 
             alert("ជោគជ័យ! ទិន្នន័យជុំចាស់ត្រូវបានកត់ត្រាទុកក្នុងប្រវត្តិកម្រងរួចរាល់។");
@@ -722,6 +753,14 @@
           if (!isRoomOpen || activeQuestions.length === 0) {
             return alert("មិនទាន់មានសំណួរនៅឡើយទេ! សូមរង់ចាំលោកគ្រូបើកបន្ទប់ប្រឡង។");
           }
+
+          // បាញ់ឈ្មោះឡើង Lobby លើផ្ទាំងគ្រូភ្លាមៗដូច Kahoot
+          sendMqttMessage("PLAYER_JOINED", {
+            id: Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+            name: userName.trim(),
+            time: getKhmerDateTime().time
+          });
+
           const randomized = shuffleArray(activeQuestions).map((q) => ({
             ...q,
             options: shuffleArray(q.options),
@@ -758,7 +797,6 @@
           return () => clearInterval(timer);
         }, [started, timeLeft, answered, currentQ, shuffledQuestions]);
 
-        // រូបមន្តគណនាពិន្ទុ Kahoot Speed Formula + Streak
         const handleAnswer = (optionText) => {
           if (answered) return;
           setAnswered(true);
@@ -779,10 +817,9 @@
             if (newStreak > newMaxStreak) newMaxStreak = newStreak;
             newCorrectCount += 1;
 
-            // Kahoot Formula: Score = 1000 * (1 - (timeUsed / 40)) + StreakBonus
             const speedFactor = 1 - (timeUsedMs / 40000);
             const basePoints = Math.round(1000 * Math.max(0.5, speedFactor));
-            const streakBonus = Math.min(100, (newStreak - 1) * 20); // Bonus ដល់ 100 pts
+            const streakBonus = Math.min(100, (newStreak - 1) * 20);
             roundPoints = basePoints + streakBonus;
           } else {
             playSound("wrong");
@@ -989,6 +1026,20 @@
                       <span>📅 {liveDate.fullDate}</span>
                     </div>
 
+                    {/* ចំនួនអ្នកចូលរួមលេងសរុប (Live Player Count Badge ដូច Kahoot) */}
+                    <div className="mt-3 flex justify-center items-center gap-2">
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-950/70 border border-indigo-700/80 rounded-2xl shadow-lg">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span className="text-sm font-black text-emerald-400">
+                          👥 អ្នកចូលរួម៖ {joinedPlayers.length} នាក់
+                        </span>
+                        <span className="text-xs text-slate-400">|</span>
+                        <span className="text-xs text-amber-300 font-bold">
+                          ✅ ឆ្លើយចប់៖ {leaderboard.length} នាក់
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="mt-4">
                       {podiumRevealStep < 3 ? (
                         <button
@@ -1013,6 +1064,7 @@
                     </div>
                   </div>
 
+                  {/* វេទិកា PODIUM */}
                   <div className="flex justify-center items-end gap-3 md:gap-6 max-w-2xl mx-auto h-64 mb-10">
                     {/* លេខ ២ */}
                     <div className="flex-1 flex flex-col items-center">
@@ -1070,10 +1122,42 @@
                     </div>
                   </div>
 
+                  {/* កន្លែងបង្ហាញឈ្មោះសិស្សកំពុងចូលរួម (Live Kahoot Lobby Cards) */}
+                  <div className={`border rounded-2xl p-5 shadow-xl mb-6 ${cardBg}`}>
+                    <div className="flex justify-between items-center mb-3 border-b pb-2 border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🎮</span>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                          សិស្សកំពុងចូលលេងក្នុងបន្ទប់ ({joinedPlayers.length} នាក់)
+                        </h3>
+                      </div>
+                      <span className="text-[11px] text-slate-400">ឈ្មោះលោតចូល Real-time ដូច Kahoot</span>
+                    </div>
+
+                    {joinedPlayers.length === 0 ? (
+                      <p className={`text-center py-4 text-xs ${subText}`}>
+                        ⏳ កំពុងរង់ចាំសិស្សវាយឈ្មោះចូលរួមប្រកួត...
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto pr-1">
+                        {joinedPlayers.map((player, pIdx) => (
+                          <div
+                            key={pIdx}
+                            className="animate-pop-in flex items-center gap-2 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 border border-purple-700/80 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span>{player.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* តារាងលទ្ធផលសិស្សដែលឆ្លើយរួចរាល់ */}
                   <div className={`border rounded-2xl p-5 shadow-xl ${cardBg}`}>
                     <div className="flex flex-wrap justify-between items-center gap-3 mb-3 border-b pb-3 border-slate-800">
                       <h3 className={`text-xs font-bold uppercase tracking-wider ${subText}`}>
-                        អ្នកចូលរួមជុំបច្ចុប្បន្ន ({leaderboard.length} នាក់) — គិតពិន្ទុ Kahoot Speed & Milliseconds
+                        លទ្ធផលសិស្សបានឆ្លើយចប់ ({leaderboard.length} នាក់)
                       </h3>
 
                       <div className="flex items-center gap-2">
@@ -1457,7 +1541,7 @@
         }
 
         // =========================================================================
-        // ផ្ទាំងសិស្សចូលលេង
+        // ផ្ទាំងសិស្សចូលលេង (STUDENT VIEW)
         // =========================================================================
         return (
           <div className={`flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 relative ${themeBg}`}>
