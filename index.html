@@ -865,10 +865,12 @@
           { bg: "bg-emerald-600 hover:bg-emerald-500", border: "border-emerald-700", shape: "■" },
         ];
 
-        const themeBg = isDark ? "bg-[#0b0f19] text-white" : "bg-slate-50 text-slate-800";
-        const cardBg = isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200 shadow-sm";
-        const subText = isDark ? "text-slate-400" : "text-slate-500";
-        const inputBg = isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-100 border-slate-300 text-slate-900";
+        // កែសម្រួល Theme ភ្លឺ (Light Mode) ឱ្យស្រទន់ កាត់បន្ថយចំណាំងពន្លឺស និងអក្សរច្បាស់ដិត
+        const themeBg = isDark ? "bg-[#0b0f19] text-white" : "bg-[#f1f5f9] text-slate-900";
+        const cardBg = isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-300 shadow-md";
+        const subText = isDark ? "text-slate-400" : "text-slate-600";
+        const inputBg = isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-300 text-slate-900";
+        const titleColor = isDark ? "text-amber-400 drop-shadow-md" : "text-indigo-950 font-black drop-shadow-sm";
 
         // =========================================================================
         // ផ្ទាំងគ្រូ (TEACHER / PROJECTOR VIEW)
@@ -897,7 +899,7 @@
                   </button>
                   <button
                     onClick={() => { setIsTeacher(false); window.location.hash = ""; }}
-                    className="text-xs text-slate-400 hover:underline"
+                    className="text-xs text-slate-500 hover:underline"
                   >
                     ← ត្រឡប់ទៅផ្ទាំងសិស្ស
                   </button>
@@ -951,7 +953,9 @@
                     
                     <button
                       onClick={() => setShowHistoryModal(true)}
-                      className="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                      className={`border px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                        isDark ? "bg-slate-800 text-cyan-300 border-slate-700" : "bg-slate-100 text-cyan-700 border-slate-300"
+                      }`}
                     >
                       📜 ប្រវត្តិប្រកួត ({historyList.length})
                     </button>
@@ -962,18 +966,17 @@
                       onClick={toggleRoomStatus}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex items-center gap-1.5 ${
                         isRoomOpen
-                          ? "bg-emerald-600/30 text-emerald-400 border-emerald-500/50 hover:bg-emerald-600/50"
-                          : "bg-rose-600/30 text-rose-400 border-rose-500/50 hover:bg-rose-600/50"
+                          ? "bg-emerald-600/20 text-emerald-600 border-emerald-500/50 hover:bg-emerald-600/30"
+                          : "bg-rose-600/20 text-rose-600 border-rose-500/50 hover:bg-rose-600/30"
                       }`}
-                      title="ចុចដើម្បី បើក/បិទ បន្ទប់ឱ្យសិស្សចូលលេង"
                     >
-                      <span className={`w-2 h-2 rounded-full ${isRoomOpen ? 'bg-emerald-400 animate-ping' : 'bg-rose-400'}`}></span>
+                      <span className={`w-2 h-2 rounded-full ${isRoomOpen ? 'bg-emerald-500 animate-ping' : 'bg-rose-500'}`}></span>
                       <span>{isRoomOpen ? "បន្ទប់កំពុងបើក (Active)" : "បន្ទប់កំពុងបិទ (Inactive)"}</span>
                     </button>
                     
                     <button
                       onClick={() => setShowPinModal(true)}
-                      className="bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                      className="bg-purple-600/20 hover:bg-purple-600/40 text-purple-700 border border-purple-400 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1"
                     >
                       🔐 ប្តូរលេខកូដ
                     </button>
@@ -981,14 +984,14 @@
                     <button
                       onClick={toggleTheme}
                       className={`p-2 rounded-xl border text-sm transition ${
-                        isDark ? "bg-slate-800 border-slate-700 text-amber-300" : "bg-slate-100 border-slate-300 text-slate-700"
+                        isDark ? "bg-slate-800 border-slate-700 text-amber-300" : "bg-slate-100 border-slate-300 text-slate-800 shadow-sm"
                       }`}
                     >
-                      {isDark ? "☀️" : "🌙"}
+                      {isDark ? "☀️ ផ្ទៃភ្លឺ" : "🌙 ផ្ទៃងងឹត"}
                     </button>
                     <button
                       onClick={() => setHideHeader(true)}
-                      className="bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                      className="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-700 border border-indigo-300 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
                     >
                       👁️‍🗨️ លាក់របារ
                     </button>
@@ -1013,23 +1016,26 @@
               {adminTab === "podium" && (
                 <div className={`max-w-5xl mx-auto w-full ${hideHeader ? "pt-4" : ""}`}>
                   <div className="text-center mb-6">
-                    <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-widest drop-shadow-md">
+                    <h1 className={`text-2xl md:text-3xl font-black uppercase tracking-widest ${titleColor}`}>
                       🏆 {appTitle}
                     </h1>
 
-                    <div className="inline-flex items-center gap-2 mt-2 px-4 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs text-amber-300 font-semibold shadow-sm">
+                    <div className={`inline-flex items-center gap-2 mt-2 px-4 py-1.5 rounded-full text-xs font-bold shadow-sm border ${
+                      isDark ? "bg-amber-500/10 border-amber-500/30 text-amber-300" : "bg-white border-slate-300 text-slate-700 shadow"
+                    }`}>
                       <span>📅 {liveDate.fullDate}</span>
                     </div>
 
-                    {/* ចំនួនអ្នកចូលរួមលេងសរុប (Live Player Count Badge ដូច Kahoot) */}
                     <div className="mt-3 flex justify-center items-center gap-2">
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-950/70 border border-indigo-700/80 rounded-2xl shadow-lg">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-                        <span className="text-sm font-black text-emerald-400">
+                      <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl shadow-md border ${
+                        isDark ? "bg-indigo-950/70 border-indigo-700/80 text-white" : "bg-white border-slate-300 text-slate-800"
+                      }`}>
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span className="text-sm font-black text-emerald-600">
                           👥 អ្នកចូលរួម៖ {joinedPlayers.length} នាក់
                         </span>
                         <span className="text-xs text-slate-400">|</span>
-                        <span className="text-xs text-amber-300 font-bold">
+                        <span className="text-xs font-bold text-indigo-900">
                           ✅ ឆ្លើយចប់៖ {leaderboard.length} នាក់
                         </span>
                       </div>
@@ -1043,56 +1049,56 @@
                           className={`px-6 py-3 rounded-2xl font-black text-sm transition-all shadow-xl flex items-center gap-2 mx-auto ${
                             leaderboard.length >= 3 && !isRevealing
                               ? "bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 hover:from-amber-400 hover:to-pink-400 text-slate-950 scale-105 animate-bounce"
-                              : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
+                              : "bg-slate-300 text-slate-500 border border-slate-400 cursor-not-allowed"
                           }`}
                         >
                           <span>{isRevealing ? "🥁 កំពុងរៀបចំប្រកាស..." : "👑 ប្រកាសជ័យលាភី Top 3 (Reveal Podium)"}</span>
-                          <span className="text-xs bg-slate-950/40 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                          <span className="text-xs bg-slate-900/30 text-slate-950 px-2 py-0.5 rounded-full font-bold">
                             {leaderboard.length} នាក់បានឆ្លើយចប់
                           </span>
                         </button>
                       ) : (
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-xs text-emerald-400 font-bold animate-pulse">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/40 rounded-full text-xs text-emerald-700 font-bold animate-pulse">
                           <span>🎉 បានប្រកាសជ័យលាភីកំពូលទាំង ៣ រូបរួចរាល់!</span>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* វេទិកា PODIUM (មកុដធំចាំងពន្លឺមាសបែប 3D) */}
+                  {/* វេទិកា PODIUM (ច្បាស់ដិតគ្រប់ Theme មិនចាំងពន្លឺ) */}
                   <div className="flex justify-center items-end gap-3 md:gap-6 max-w-2xl mx-auto h-64 mb-10">
                     {/* លេខ ២ */}
                     <div className="flex-1 flex flex-col items-center">
                       {podiumRevealStep >= 2 ? (
                         <div className="flex flex-col items-center animate-pop-in">
-                          <div className="text-sm font-black truncate max-w-[100px] mb-1 text-slate-200">{top2?.name}</div>
-                          <div className="text-xs text-slate-400 mb-0.5 font-bold">{top2?.score} pts ({top2?.correctCount} ត្រូវ)</div>
-                          <div className="text-[11px] text-purple-400 font-semibold mb-2">⏱️ {(top2?.timeSpentMs / 1000).toFixed(2)}s</div>
+                          <div className={`text-sm font-black truncate max-w-[100px] mb-1 ${isDark ? "text-slate-200" : "text-slate-800"}`}>{top2?.name}</div>
+                          <div className={`text-xs mb-0.5 font-bold ${isDark ? "text-slate-400" : "text-slate-600"}`}>{top2?.score} pts ({top2?.correctCount} ត្រូវ)</div>
+                          <div className="text-[11px] text-purple-600 font-semibold mb-2">⏱️ {(top2?.timeSpentMs / 1000).toFixed(2)}s</div>
                         </div>
                       ) : (
-                        <div className="h-14 flex items-center justify-center text-xl text-slate-600 font-black">? ? ?</div>
+                        <div className={`h-14 flex items-center justify-center text-xl font-black ${isDark ? "text-slate-600" : "text-slate-400"}`}>? ? ?</div>
                       )}
-                      <div className={`w-full bg-gradient-to-t from-slate-700 to-slate-500 rounded-t-2xl flex flex-col items-center justify-center border-t-4 border-slate-300 shadow-xl transition-all duration-700 ${podiumRevealStep >= 2 ? 'h-36' : 'h-24 opacity-60'}`}>
+                      <div className={`w-full bg-gradient-to-t from-slate-600 to-slate-400 rounded-t-2xl flex flex-col items-center justify-center border-t-4 border-slate-300 shadow-xl transition-all duration-700 ${podiumRevealStep >= 2 ? 'h-36' : 'h-24 opacity-60'}`}>
                         <span className="text-3xl">🥈</span>
                         <span className="text-xl font-black text-white mt-1">2</span>
                       </div>
                     </div>
 
-                    {/* លេខ ១ ជើងឯក (មកុដធំ ចាំងពន្លឺមាសបែប 3D) */}
+                    {/* លេខ ១ ជើងឯក (មកុដធំចាំងពន្លឺមាសបែប 3D) */}
                     <div className="flex-1 flex flex-col items-center">
                       {podiumRevealStep >= 3 ? (
                         <div className="flex flex-col items-center animate-pop-in">
                           <span className="text-5xl animate-bounce drop-shadow-[0_0_25px_rgba(245,158,11,1)] filter brightness-110">👑</span>
-                          <div className="text-base font-black text-amber-400 truncate max-w-[120px] mb-1 drop-shadow-md">{top1?.name}</div>
-                          <div className="text-xs text-amber-300 font-bold mb-0.5">{top1?.score} pts ({top1?.correctCount} ត្រូវ)</div>
-                          <div className="text-[11px] text-amber-200 font-bold mb-2">⏱️ {(top1?.timeSpentMs / 1000).toFixed(2)}s 🔥x{top1?.maxStreak}</div>
+                          <div className={`text-base font-black truncate max-w-[120px] mb-1 ${isDark ? "text-amber-400" : "text-amber-600"}`}>{top1?.name}</div>
+                          <div className={`text-xs font-bold mb-0.5 ${isDark ? "text-amber-300" : "text-amber-700"}`}>{top1?.score} pts ({top1?.correctCount} ត្រូវ)</div>
+                          <div className="text-[11px] text-amber-700 font-bold mb-2">⏱️ {(top1?.timeSpentMs / 1000).toFixed(2)}s 🔥x{top1?.maxStreak}</div>
                         </div>
                       ) : (
                         <div className="h-20 flex flex-col items-center justify-center mb-1">
                           <span className="text-5xl animate-bounce drop-shadow-[0_0_20px_rgba(245,158,11,0.9)] filter brightness-110">
                             👑
                           </span>
-                          <span className="text-xs font-black tracking-wider text-amber-400 drop-shadow-[0_2px_8px_rgba(245,158,11,0.6)] mt-1.5">
+                          <span className={`text-xs font-black tracking-wider mt-1.5 ${isDark ? "text-amber-400" : "text-amber-700 font-bold"}`}>
                             រង់ចាំជើងឯក
                           </span>
                         </div>
@@ -1107,30 +1113,30 @@
                     <div className="flex-1 flex flex-col items-center">
                       {podiumRevealStep >= 1 ? (
                         <div className="flex flex-col items-center animate-pop-in">
-                          <div className="text-sm font-black text-amber-600 truncate max-w-[100px] mb-1">{top3?.name}</div>
-                          <div className="text-xs text-slate-400 mb-0.5 font-bold">{top3?.score} pts ({top3?.correctCount} ត្រូវ)</div>
-                          <div className="text-[11px] text-purple-400 font-semibold mb-2">⏱️ {(top3?.timeSpentMs / 1000).toFixed(2)}s</div>
+                          <div className={`text-sm font-black truncate max-w-[100px] mb-1 ${isDark ? "text-amber-500" : "text-amber-800"}`}>{top3?.name}</div>
+                          <div className={`text-xs mb-0.5 font-bold ${isDark ? "text-slate-400" : "text-slate-600"}`}>{top3?.score} pts ({top3?.correctCount} ត្រូវ)</div>
+                          <div className="text-[11px] text-purple-600 font-semibold mb-2">⏱️ {(top3?.timeSpentMs / 1000).toFixed(2)}s</div>
                         </div>
                       ) : (
-                        <div className="h-14 flex items-center justify-center text-xl text-slate-600 font-black">? ? ?</div>
+                        <div className={`h-14 flex items-center justify-center text-xl font-black ${isDark ? "text-slate-600" : "text-slate-400"}`}>? ? ?</div>
                       )}
-                      <div className={`w-full bg-gradient-to-t from-amber-900 to-amber-700 rounded-t-2xl flex flex-col items-center justify-center border-t-4 border-amber-600 shadow-lg transition-all duration-700 ${podiumRevealStep >= 1 ? 'h-28' : 'h-20 opacity-60'}`}>
+                      <div className={`w-full bg-gradient-to-t from-amber-800 to-amber-600 rounded-t-2xl flex flex-col items-center justify-center border-t-4 border-amber-500 shadow-lg transition-all duration-700 ${podiumRevealStep >= 1 ? 'h-28' : 'h-20 opacity-60'}`}>
                         <span className="text-3xl">🥉</span>
                         <span className="text-xl font-black text-white mt-1">3</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* កន្លែងបង្ហាញឈ្មោះសិស្សកំពុងចូលរួម (Live Kahoot Lobby Cards) */}
+                  {/* កន្លែងបង្ហាញឈ្មោះសិស្សកំពុងចូលរួម */}
                   <div className={`border rounded-2xl p-5 shadow-xl mb-6 ${cardBg}`}>
-                    <div className="flex justify-between items-center mb-3 border-b pb-2 border-slate-800">
+                    <div className={`flex justify-between items-center mb-3 border-b pb-2 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
                       <div className="flex items-center gap-2">
                         <span className="text-lg">🎮</span>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                        <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-amber-400" : "text-indigo-900"}`}>
                           សិស្សកំពុងចូលលេងក្នុងបន្ទប់ ({joinedPlayers.length} នាក់)
                         </h3>
                       </div>
-                      <span className="text-[11px] text-slate-400">ឈ្មោះលោតចូល Real-time ដូច Kahoot</span>
+                      <span className={`text-[11px] ${subText}`}>ឈ្មោះលោតចូល Real-time ដូច Kahoot</span>
                     </div>
 
                     {joinedPlayers.length === 0 ? (
@@ -1142,9 +1148,13 @@
                         {joinedPlayers.map((player, pIdx) => (
                           <div
                             key={pIdx}
-                            className="animate-pop-in flex items-center gap-2 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 border border-purple-700/80 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm"
+                            className={`animate-pop-in flex items-center gap-2 border px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm ${
+                              isDark
+                                ? "bg-gradient-to-r from-purple-900/60 to-indigo-900/60 border-purple-700 text-white"
+                                : "bg-indigo-50 border-indigo-200 text-indigo-900"
+                            }`}
                           >
-                            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                             <span>{player.name}</span>
                           </div>
                         ))}
@@ -1154,7 +1164,7 @@
 
                   {/* តារាងលទ្ធផលសិស្សដែលឆ្លើយរួចរាល់ */}
                   <div className={`border rounded-2xl p-5 shadow-xl ${cardBg}`}>
-                    <div className="flex flex-wrap justify-between items-center gap-3 mb-3 border-b pb-3 border-slate-800">
+                    <div className={`flex flex-wrap justify-between items-center gap-3 mb-3 border-b pb-3 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
                       <h3 className={`text-xs font-bold uppercase tracking-wider ${subText}`}>
                         លទ្ធផលសិស្សបានឆ្លើយចប់ ({leaderboard.length} នាក់)
                       </h3>
@@ -1184,13 +1194,13 @@
                             <div className="flex items-center gap-3">
                               <span className={`font-bold w-6 ${subText}`}>#{idx + 1}</span>
                               <div>
-                                <span className="font-medium">{item.name}</span>
+                                <span className="font-bold text-slate-900">{item.name}</span>
                                 <span className="text-[10px] text-slate-500 ml-2">({item.correctCount || 0} ត្រូវ)</span>
                               </div>
                             </div>
                             <div className="flex items-center gap-4">
                               <span className={`text-xs ${subText}`}>⏱️ {(item.timeSpentMs / 1000).toFixed(3)} វិនាទី</span>
-                              <span className="font-black text-amber-400">
+                              <span className="font-black text-indigo-900">
                                 {item.score} <span className={`text-xs font-normal ${subText}`}>pts</span>
                               </span>
                             </div>
@@ -1206,7 +1216,7 @@
                 <div className="max-w-5xl mx-auto w-full space-y-6">
                   <div className={`border p-5 rounded-3xl shadow-xl flex flex-wrap items-center justify-between gap-4 ${cardBg}`}>
                     <div className="flex-1 min-w-[280px]">
-                      <label className="text-xs text-amber-400 font-bold block mb-1">🏷️ កែប្រែចំណងជើងកម្មវិធី៖</label>
+                      <label className={`text-xs font-bold block mb-1 ${isDark ? "text-amber-400" : "text-indigo-950"}`}>🏷️ កែប្រែចំណងជើងកម្មវិធី៖</label>
                       <input
                         type="text"
                         value={appTitle}
@@ -1259,7 +1269,7 @@
                       <div key={q.id || qIdx} className={`border p-5 rounded-3xl shadow-xl space-y-4 ${cardBg}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 flex items-center gap-3">
-                            <span className="bg-purple-950 text-purple-400 border border-purple-800 w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">
+                            <span className="bg-purple-950 text-purple-300 border border-purple-800 w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm shrink-0">
                               {qIdx + 1}
                             </span>
                             <textarea
@@ -1272,7 +1282,7 @@
                           </div>
                           <button
                             onClick={() => handleDeleteQuestion(qIdx)}
-                            className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 p-2.5 rounded-xl transition shrink-0"
+                            className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 p-2.5 rounded-xl transition shrink-0"
                           >
                             🗑️
                           </button>
@@ -1299,11 +1309,11 @@
                                 onChange={(e) => handleOptionChange(qIdx, optIdx, e.target.value)}
                                 placeholder={`ជម្រើសទី ${optIdx + 1}`}
                                 className={`w-full bg-transparent text-xs focus:outline-none ${
-                                  q.answer === opt ? "text-emerald-500 font-bold" : ""
+                                  q.answer === opt ? "text-emerald-600 font-bold" : ""
                                 }`}
                               />
                               {q.answer === opt && (
-                                <span className="text-emerald-500 text-xs font-bold pr-2 shrink-0">✓ ត្រូវ</span>
+                                <span className="text-emerald-600 text-xs font-bold pr-2 shrink-0">✓ ត្រូវ</span>
                               )}
                             </div>
                           ))}
@@ -1318,15 +1328,15 @@
               {showQuizBankModal && (
                 <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className={`max-w-3xl w-full rounded-3xl border p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col ${cardBg}`}>
-                    <div className="flex justify-between items-center border-b pb-3 border-slate-800">
+                    <div className={`flex justify-between items-center border-b pb-3 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
                       <div>
-                        <h3 className="text-lg font-bold text-amber-400 flex items-center gap-2">
+                        <h3 className={`text-lg font-bold flex items-center gap-2 ${isDark ? "text-amber-400" : "text-indigo-950"}`}>
                           <span>🗄️</span>
                           <span>បណ្ណាល័យកម្រងសំណួរចាស់ៗ (Saved Quiz Bank)</span>
                         </h3>
                         <p className={`text-xs ${subText}`}>សំណួរដែលធ្លាប់បានបង្កើតត្រូវបានកត់ត្រាទុកតាមថ្ងៃខែឆ្នាំ</p>
                       </div>
-                      <button onClick={() => setShowQuizBankModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                      <button onClick={() => setShowQuizBankModal(false)} className="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-3 pr-1">
@@ -1336,15 +1346,15 @@
                         savedQuizBank.map((item) => (
                           <div key={item.id} className={`p-4 rounded-2xl border ${isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200"} flex flex-wrap justify-between items-center gap-3`}>
                             <div>
-                              <div className="font-bold text-sm text-purple-300">{item.title}</div>
+                              <div className={`font-bold text-sm ${isDark ? "text-purple-300" : "text-indigo-900"}`}>{item.title}</div>
                               <div className={`text-xs ${subText} mt-0.5`}>
-                                📅 {item.date} • ម៉ោង {item.time} | 📝 ចំនួន៖ <span className="font-bold text-amber-400">{item.questionsCount} សំណួរ</span>
+                                📅 {item.date} • ម៉ោង {item.time} | 📝 ចំនួន៖ <span className="font-bold text-amber-600">{item.questionsCount} សំណួរ</span>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => exportQuestionsToWord(item.questions, item.title, item.date)}
-                                className="bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                                className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-700 border border-blue-300 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1"
                               >
                                 📄 Word
                               </button>
@@ -1360,11 +1370,11 @@
                       )}
                     </div>
 
-                    <div className="flex justify-between items-center pt-3 border-t border-slate-800 text-xs">
+                    <div className={`flex justify-between items-center pt-3 border-t text-xs ${isDark ? "border-slate-800" : "border-slate-200"}`}>
                       <span className={subText}>សរុប {savedQuizBank.length} កម្រងសំណួរ</span>
                       <button
                         onClick={() => setShowQuizBankModal(false)}
-                        className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        className="px-4 py-2 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold"
                       >
                         បិទផ្ទាំង
                       </button>
@@ -1377,15 +1387,15 @@
               {showHistoryModal && (
                 <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className={`max-w-3xl w-full rounded-3xl border p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col ${cardBg}`}>
-                    <div className="flex justify-between items-center border-b pb-3 border-slate-800">
+                    <div className={`flex justify-between items-center border-b pb-3 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
                       <div>
-                        <h3 className="text-lg font-bold text-cyan-400 flex items-center gap-2">
+                        <h3 className={`text-lg font-bold flex items-center gap-2 ${isDark ? "text-cyan-400" : "text-indigo-950"}`}>
                           <span>📜</span>
                           <span>ប្រវត្តិនៃការប្រកួតកន្លងមក (Match History)</span>
                         </h3>
                         <p className={`text-xs ${subText}`}>ទិន្នន័យគ្រប់ជុំទាំងអស់ត្រូវបានរក្សាទុកដោយសុវត្ថិភាព</p>
                       </div>
-                      <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                      <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-3 pr-1">
@@ -1395,18 +1405,18 @@
                         historyList.map((item, hIdx) => (
                           <div key={item.id} className={`p-4 rounded-2xl border ${isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200"} flex flex-wrap justify-between items-center gap-3`}>
                             <div>
-                              <div className="font-bold text-sm text-amber-400">{item.title}</div>
+                              <div className="font-bold text-sm text-amber-600">{item.title}</div>
                               <div className={`text-xs ${subText} mt-0.5`}>
-                                📅 {item.date} • ម៉ោង {item.time} | 👥 សិស្សចូលរួម៖ <span className="font-bold text-white">{item.totalParticipants} នាក់</span>
+                                📅 {item.date} • ម៉ោង {item.time} | 👥 សិស្សចូលរួម៖ <span className="font-bold text-indigo-900">{item.totalParticipants} នាក់</span>
                               </div>
-                              <div className="text-xs text-emerald-400 font-medium mt-1">
+                              <div className="text-xs text-emerald-600 font-medium mt-1">
                                 🥇 ជើងឯកលេខ ១៖ {item.top1}
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => exportTableToExcel(item.data, `${item.title}_ជុំទី${historyList.length - hIdx}`, item.date)}
-                                className="bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                                className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1"
                               >
                                 📊 ទាញយក Excel
                               </button>
@@ -1416,11 +1426,11 @@
                       )}
                     </div>
 
-                    <div className="flex justify-between items-center pt-3 border-t border-slate-800 text-xs">
+                    <div className={`flex justify-between items-center pt-3 border-t text-xs ${isDark ? "border-slate-800" : "border-slate-200"}`}>
                       <span className={subText}>សរុប {historyList.length} ជុំប្រកួត</span>
                       <button
                         onClick={() => setShowHistoryModal(false)}
-                        className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        className="px-4 py-2 rounded-xl bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold"
                       >
                         បិទផ្ទាំង
                       </button>
@@ -1433,12 +1443,12 @@
               {showImportModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className={`max-w-2xl w-full rounded-3xl border p-6 shadow-2xl space-y-4 ${cardBg}`}>
-                    <div className="flex justify-between items-center border-b pb-3 border-slate-800">
+                    <div className={`flex justify-between items-center border-b pb-3 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
                       <div>
-                        <h3 className="text-lg font-bold text-amber-400">⚡ បញ្ចូលសំណួររហ័ស (Bulk Import)</h3>
+                        <h3 className={`text-lg font-bold ${isDark ? "text-amber-400" : "text-indigo-950"}`}>⚡ បញ្ចូលសំណួររហ័ស (Bulk Import)</h3>
                         <p className={`text-xs ${subText}`}>ចម្លងពី Word, Excel ឬ AI រួចបិទភ្ជាប់ (Paste) ចូលទីនេះភ្លាមៗ</p>
                       </div>
-                      <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                      <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
                     </div>
 
                     <textarea
@@ -1458,7 +1468,7 @@
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => setShowImportModal(false)}
-                        className="px-4 py-2 rounded-xl text-xs bg-slate-800 text-slate-300"
+                        className="px-4 py-2 rounded-xl text-xs bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold"
                       >
                         បោះបង់
                       </button>
@@ -1477,17 +1487,17 @@
               {showPinModal && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                   <div className={`max-w-sm w-full rounded-3xl border p-6 shadow-2xl space-y-4 ${cardBg}`}>
-                    <div className="flex justify-between items-center border-b pb-3 border-slate-800">
-                      <h3 className="text-base font-bold text-amber-400 flex items-center gap-2">
+                    <div className={`flex justify-between items-center border-b pb-3 ${isDark ? "border-slate-800" : "border-slate-200"}`}>
+                      <h3 className={`text-base font-bold flex items-center gap-2 ${isDark ? "text-amber-400" : "text-indigo-950"}`}>
                         <span>🔐</span>
                         <span>ប្តូរលេខសម្ងាត់គ្រូបង្រៀន</span>
                       </h3>
-                      <button onClick={() => setShowPinModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                      <button onClick={() => setShowPinModal(false)} className="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
                     </div>
 
                     <div className="space-y-3">
                       <div>
-                        <label className="text-xs text-slate-300 block mb-1">លេខសម្ងាត់ចាស់៖</label>
+                        <label className={`text-xs block mb-1 font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>លេខសម្ងាត់ចាស់៖</label>
                         <input
                           type="password"
                           placeholder="••••"
@@ -1497,7 +1507,7 @@
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-300 block mb-1">លេខសម្ងាត់ថ្មី (យ៉ាងតិច ៤ ខ្ទង់)៖</label>
+                        <label className={`text-xs block mb-1 font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>លេខសម្ងាត់ថ្មី (យ៉ាងតិច ៤ ខ្ទង់)៖</label>
                         <input
                           type="password"
                           placeholder="••••"
@@ -1507,7 +1517,7 @@
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-300 block mb-1">ផ្ទៀងផ្ទាត់លេខសម្ងាត់ថ្មី៖</label>
+                        <label className={`text-xs block mb-1 font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>ផ្ទៀងផ្ទាត់លេខសម្ងាត់ថ្មី៖</label>
                         <input
                           type="password"
                           placeholder="••••"
@@ -1521,7 +1531,7 @@
                     <div className="flex justify-end gap-2 pt-2">
                       <button
                         onClick={() => setShowPinModal(false)}
-                        className="px-4 py-2 rounded-xl text-xs bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        className="px-4 py-2 rounded-xl text-xs bg-slate-200 text-slate-800 hover:bg-slate-300 font-bold"
                       >
                         បោះបង់
                       </button>
@@ -1540,14 +1550,16 @@
         }
 
         // =========================================================================
-        // ផ្ទាំងសិស្សចូលលេង (STUDENT VIEW)
+        // ផ្ទាំងសិស្សចូលលេង
         // =========================================================================
         return (
           <div className={`flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 relative ${themeBg}`}>
             <div className="absolute top-3 right-3">
               <button
                 onClick={() => { window.location.hash = "#admin"; setIsTeacher(true); }}
-                className="text-[11px] bg-slate-800/60 hover:bg-slate-700/80 text-slate-400 border border-slate-700/70 px-3 py-1.5 rounded-xl transition flex items-center gap-1"
+                className={`text-[11px] border px-3 py-1.5 rounded-xl transition flex items-center gap-1 ${
+                  isDark ? "bg-slate-800/60 text-slate-400 border-slate-700" : "bg-white text-slate-700 border-slate-300 shadow-sm"
+                }`}
               >
                 <span>🔑</span>
                 <span>ផ្ទាំងគ្រូ</span>
@@ -1557,10 +1569,10 @@
             {!isRoomOpen || activeQuestions.length === 0 ? (
               <div className={`p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl relative ${cardBg}`}>
                 <div className="text-6xl mb-4 animate-bounce">⏳</div>
-                <h2 className="text-xl font-black text-amber-400 mb-2">មិនទាន់មានសំណួរនៅឡើយទេ!</h2>
-                <div className="text-xs text-slate-300 leading-relaxed mb-6">
+                <h2 className={`text-xl font-black mb-2 ${isDark ? "text-amber-400" : "text-indigo-950"}`}>មិនទាន់មានសំណួរនៅឡើយទេ!</h2>
+                <div className={`text-xs leading-relaxed mb-6 ${subText}`}>
                   លោកគ្រូកំពុងរៀបចំកម្រងសំណួរថ្មី...<br />
-                  សូមរង់ចាំបន្តិច ឬចុច <span className="text-amber-300 font-bold">Refresh</span> នៅពេលលោកគ្រូប្រកាសឱ្យចូលលេង។
+                  សូមរង់ចាំបន្តិច ឬចុច <span className="font-bold text-purple-600">Refresh</span> នៅពេលលោកគ្រូប្រកាសឱ្យចូលលេង។
                 </div>
                 <button
                   onClick={() => window.location.reload()}
@@ -1569,18 +1581,18 @@
                   <span>🔄</span>
                   <span>ផ្ទុកទំព័រឡើងវិញ (Refresh)</span>
                 </button>
-                <div className="mt-6 pt-4 border-t border-slate-800/60 text-[11px] text-slate-500">
-                  រៀបចំដោយ៖ <span className="font-bold text-amber-400">អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
+                <div className={`mt-6 pt-4 border-t text-[11px] ${isDark ? "border-slate-800 text-slate-500" : "border-slate-200 text-slate-600"}`}>
+                  រៀបចំដោយ៖ <span className="font-bold text-amber-600">អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
                 </div>
               </div>
             ) : !started ? (
               <div className={`p-6 sm:p-8 rounded-3xl border max-w-sm w-full text-center shadow-2xl relative ${cardBg}`}>
                 <div className="text-5xl sm:text-6xl mb-3 animate-bounce">⚡</div>
-                <h1 className="text-lg sm:text-2xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 leading-snug">
+                <h1 className="text-lg sm:text-2xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 leading-snug">
                   {appTitle}
                 </h1>
 
-                <div className="text-[11px] text-amber-400 font-medium mb-2">
+                <div className={`text-[11px] font-bold mb-2 ${isDark ? "text-amber-400" : "text-amber-600"}`}>
                   📅 {liveDate.fullDate}
                 </div>
 
@@ -1600,31 +1612,31 @@
                   onClick={startStudentGame}
                   disabled={!userName.trim()}
                   className={`w-full py-3.5 rounded-2xl font-bold transition shadow-lg text-sm sm:text-base ${
-                    userName.trim() ? "bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30 active:scale-95" : "bg-slate-800 text-slate-600 cursor-not-allowed"
+                    userName.trim() ? "bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30 active:scale-95" : "bg-slate-300 text-slate-500 cursor-not-allowed"
                   }`}
                 >
                   ចូលរួមប្រកួត 🚀
                 </button>
 
-                <div className="mt-6 pt-4 border-t border-slate-800/60 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+                <div className={`mt-6 pt-4 border-t text-[11px] ${isDark ? "border-slate-800 text-slate-500" : "border-slate-200 text-slate-600"}`}>
                   <span>បង្កើតឡើងដោយ៖</span>
-                  <span className="font-bold text-amber-400">អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
+                  <span className="font-bold text-amber-600"> អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
                 </div>
               </div>
             ) : currentQ < shuffledQuestions.length ? (
               <div className="w-full max-w-lg flex flex-col gap-3">
                 <div className={`flex justify-between items-center border px-4 py-2.5 rounded-2xl ${cardBg}`}>
-                  <span className="text-[11px] font-bold bg-purple-950 text-purple-300 border border-purple-800 px-3 py-1 rounded-full">
+                  <span className="text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-300 px-3 py-1 rounded-full">
                     {currentQ + 1} / {shuffledQuestions.length}
                   </span>
 
                   <div className="flex items-center gap-2">
                     {streak > 1 && (
-                      <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold">
+                      <span className="text-[10px] bg-amber-500/20 text-amber-700 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold">
                         🔥 Streak x{streak}
                       </span>
                     )}
-                    <div className={`flex items-center gap-1 font-black text-base ${timeLeft <= 5 ? "timer-warn" : "text-amber-400"}`}>
+                    <div className={`flex items-center gap-1 font-black text-base ${timeLeft <= 5 ? "timer-warn" : "text-amber-600"}`}>
                       <span>⏱️</span>
                       <span>{timeLeft}s</span>
                     </div>
@@ -1634,7 +1646,7 @@
                 </div>
 
                 <div className={`border p-5 sm:p-6 rounded-3xl text-center shadow-xl min-h-[110px] flex items-center justify-center ${cardBg}`}>
-                  <h2 className="text-base sm:text-lg font-bold leading-relaxed">
+                  <h2 className="text-base sm:text-lg font-bold leading-relaxed text-slate-900">
                     {shuffledQuestions[currentQ].question}
                   </h2>
                 </div>
@@ -1650,7 +1662,7 @@
                       } else if (selectedOpt === opt) {
                         extraStyle = "bg-rose-700 border-rose-600 opacity-60 text-white";
                       } else {
-                        extraStyle = "opacity-30 bg-slate-800 border-slate-700";
+                        extraStyle = "opacity-30 bg-slate-600 border-slate-500";
                       }
                     }
 
@@ -1671,27 +1683,29 @@
             ) : (
               <div className={`border p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center shadow-2xl ${cardBg}`}>
                 <div className="text-6xl mb-2 animate-pulse">🏆</div>
-                <h2 className="text-xl font-black mb-1">អបអរសាទរ {userName}!</h2>
+                <h2 className={`text-xl font-black mb-1 ${isDark ? "text-white" : "text-slate-900"}`}>អបអរសាទរ {userName}!</h2>
                 <p className={`text-xs mb-4 ${subText}`}>អ្នកបានឆ្លើយចប់សំណួរទាំងអស់</p>
 
                 <div className={`border p-4 rounded-2xl mb-4 ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
                   <span className={`text-[11px] uppercase tracking-widest font-bold ${subText}`}>ពិន្ទុទទួលបាន (Kahoot Score)</span>
-                  <div className="text-3xl font-black text-amber-400 my-1">
+                  <div className="text-3xl font-black text-amber-600 my-1">
                     {score} <span className={`text-sm font-normal ${subText}`}>pts</span>
                   </div>
-                  <div className="flex justify-center gap-3 text-xs text-slate-400 mt-1">
+                  <div className="flex justify-center gap-3 text-xs text-slate-500 mt-1">
                     <span>✅ ត្រូវ {correctCount} សំណួរ</span>
                     <span>•</span>
                     <span>⏱️ {(totalTimeSpentMs / 1000).toFixed(2)}s</span>
                   </div>
                 </div>
 
-                <div className="p-3 bg-purple-950/40 border border-purple-800/50 rounded-xl text-xs text-purple-300 leading-relaxed">
+                <div className={`p-3 rounded-xl text-xs leading-relaxed border ${
+                  isDark ? "bg-purple-950/40 border-purple-800 text-purple-300" : "bg-purple-50 border-purple-200 text-purple-800"
+                }`}>
                   📢 លទ្ធផលត្រូវបានបញ្ជូនទៅផ្ទាំងធំ (Podium) របស់គ្រូរួចរាល់ហើយ!
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-slate-800/50 text-[11px] text-slate-500">
-                  កម្មវិធីរៀបចំដោយ៖ <span className="font-bold text-amber-400">អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
+                <div className={`mt-5 pt-3 border-t text-[11px] ${isDark ? "border-slate-800 text-slate-500" : "border-slate-200 text-slate-600"}`}>
+                  កម្មវិធីរៀបចំដោយ៖ <span className="font-bold text-amber-600">អ៊ាង យ៉ាឌីន ICTព្រៃវែង</span>
                 </div>
               </div>
             )}
